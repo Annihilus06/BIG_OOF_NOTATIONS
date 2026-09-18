@@ -202,26 +202,26 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
         </div>
       )}
 
-      {/* 4 Primary Metric KPI Cards in BDT (?) */}
+      {/* 4 Primary Metric KPI Cards in BDT */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         
         {/* Card 1: Total Optimized Bill */}
         <div className="p-4 rounded-2xl bg-[#1c1c1c] border border-[#2e2e2e] shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
             <span>TOTAL OPTIMIZED BILL</span>
-            <span className="text-sky-400 font-bold text-sm">?</span>
+            <span className="text-sky-400 font-bold text-xs font-mono">BDT</span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl sm:text-3xl font-bold font-mono text-white tracking-tight">
-              ?{costTotal.toFixed(2)}
+              BDT {costTotal.toFixed(2)}
             </span>
             <span className="text-xs font-mono text-slate-400">
-              Base: ?{costBaseline.toFixed(2)}
+              Base: BDT {costBaseline.toFixed(2)}
             </span>
           </div>
           <div className="pt-2 border-t border-[#2a2a2a] flex items-center justify-between text-xs text-slate-400">
             <span>Currency:</span>
-            <span className="text-slate-200 font-mono font-medium">BDT (?)</span>
+            <span className="text-slate-200 font-mono font-medium">BDT</span>
           </div>
         </div>
 
@@ -233,7 +233,7 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl sm:text-3xl font-bold font-mono text-emerald-400 tracking-tight">
-              ?{costSavings.toFixed(2)}
+              BDT {costSavings.toFixed(2)}
             </span>
             <Badge variant="success">
               +{result.savings_pct.toFixed(1)}%
@@ -425,7 +425,7 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
               <div className="flex items-center justify-between pb-3 border-b border-[#2e2e2e]">
                 <div>
                   <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                    <span className="text-sky-400 font-bold">?</span>
+                    <span className="text-sky-400 font-bold text-xs font-mono">BDT</span>
                     Hourly Electricity Cost & TOU Tariff
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">Peak hour discharge cost reduction (BDT)</p>
@@ -438,11 +438,11 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
                   <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
                     <XAxis dataKey="hour" stroke="#888" tick={{ fontSize: 11, fill: '#888' }} />
-                    <YAxis stroke="#888" tick={{ fontSize: 11, fill: '#888' }} unit=" ?" />
+                    <YAxis stroke="#888" tick={{ fontSize: 11, fill: '#888' }} unit=" BDT" />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                    <Bar dataKey="hourlyCost" name="Net Cost (?)" unit=" ?" fill={COLORS.chart.demand} radius={[2, 2, 0, 0]} />
-                    <Line type="monotone" dataKey="tariff" name="Tariff (?/kWh)" unit=" ?/kWh" stroke={COLORS.chart.tariff} strokeWidth={1.5} dot={false} />
+                    <Bar dataKey="hourlyCost" name="Net Cost (BDT)" unit=" BDT" fill={COLORS.chart.demand} radius={[2, 2, 0, 0]} />
+                    <Line type="monotone" dataKey="tariff" name="Tariff (BDT/kWh)" unit=" BDT/kWh" stroke={COLORS.chart.tariff} strokeWidth={1.5} dot={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -461,7 +461,7 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
               <h3 className="text-sm font-semibold text-white">
                 24-Hour SCADA Dispatch Schedule Matrix
               </h3>
-              <p className="text-xs text-slate-400">All energy values in kWh, monetary costs in BDT (?)</p>
+              <p className="text-xs text-slate-400">All energy values in kWh, monetary costs in BDT</p>
             </div>
             <button
               onClick={handleExportCSV}
@@ -483,8 +483,8 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
                   <th className="p-3 text-emerald-400">Bat Dischg</th>
                   <th className="p-3 text-sky-400">Bat SOC</th>
                   <th className="p-3 text-rose-400">Grid Import</th>
-                  <th className="p-3">Tariff (?)</th>
-                  <th className="p-3 text-right">Cost (?)</th>
+                  <th className="p-3">Tariff (BDT)</th>
+                  <th className="p-3 text-right">Cost (BDT)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#262626] text-slate-300">
@@ -497,8 +497,8 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
                     <td className="p-3 text-emerald-400">{row.battery_discharge_kwh > 0 ? `-${row.battery_discharge_kwh.toFixed(2)}` : '0.00'}</td>
                     <td className="p-3 text-sky-300">{row.battery_soc_pct.toFixed(0)}% ({row.battery_soc_kwh.toFixed(1)}kwh)</td>
                     <td className="p-3 text-rose-300">{row.grid_import_kwh.toFixed(2)}</td>
-                    <td className="p-3 text-slate-400">?{(row.tariff_bdt_per_kwh || row.tariff_per_kwh).toFixed(2)}</td>
-                    <td className="p-3 text-right font-bold text-white">?{(row.hourly_cost_bdt || row.hourly_cost).toFixed(2)}</td>
+                    <td className="p-3 text-slate-400">BDT {(row.tariff_bdt_per_kwh || row.tariff_per_kwh).toFixed(2)}</td>
+                    <td className="p-3 text-right font-bold text-white">BDT {(row.hourly_cost_bdt || row.hourly_cost).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
