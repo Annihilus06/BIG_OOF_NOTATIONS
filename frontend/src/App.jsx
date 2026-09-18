@@ -158,12 +158,16 @@ export default function App() {
     }
   };
 
+  const [promptViewKey, setPromptViewKey] = useState(0);
+
   const handleNewOptimization = () => {
     setOperatorPrompt('');
     setDirectives([]);
     setScenario(DEFAULT_SCENARIOS.default);
     setResult(null);
+    setPromptViewKey(prev => prev + 1);
     navigateTo('optimizer'); // Navigates to /
+    showToast('Ready for new optimization.');
   };
 
   const handleClearHistory = () => {
@@ -301,6 +305,7 @@ export default function App() {
           {/* PAGE 1: CHATGPT-STYLE INPUT PROMPT VIEW (URL: /) */}
           {activeTab === 'optimizer' && (
             <ChatPromptView
+              key={promptViewKey}
               scenario={scenario}
               setScenario={setScenario}
               directives={directives}

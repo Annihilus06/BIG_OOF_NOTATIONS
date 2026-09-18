@@ -33,10 +33,18 @@ export default function Sidebar({
         transition-all duration-200 ease-in-out select-none
         ${isOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:border-none lg:overflow-hidden'}
       `}>
-        {/* Top Header */}
+        {/* Top Header - Click to redirect to homepage */}
         <div className="flex items-center justify-between p-3.5 border-b border-[#262626]">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#2563EB] flex items-center justify-center text-white font-bold text-xs shadow-xs">
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              onNewOptimization();
+            }}
+            className="flex items-center space-x-2.5 hover:opacity-90 transition-opacity cursor-pointer group"
+            title="Go to GridWise AI Homepage"
+          >
+            <div className="w-7 h-7 rounded-lg bg-[#2563EB] group-hover:bg-[#1d4ed8] flex items-center justify-center text-white font-bold text-xs shadow-xs transition-colors">
               GW
             </div>
             <div>
@@ -45,7 +53,7 @@ export default function Sidebar({
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#262626] text-slate-300">v1.0</span>
               </div>
             </div>
-          </div>
+          </a>
 
           <button
             onClick={() => setIsOpen(false)}
@@ -56,21 +64,23 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Action: + New Optimization Button */}
+        {/* Action: + New Optimization Button - Click to reset and go to homepage */}
         <div className="p-3">
-          <button
-            onClick={() => {
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
               onNewOptimization();
-              setActiveTab('optimizer');
             }}
             className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#212121] hover:bg-[#2f2f2f] text-white text-xs font-medium border border-[#2f2f2f] hover:border-[#404040] transition-all cursor-pointer shadow-xs group"
+            title="Start New Optimization"
           >
             <div className="flex items-center space-x-2">
               <Plus className="w-4 h-4 text-sky-400 group-hover:rotate-90 transition-transform duration-200" />
               <span>New optimization</span>
             </div>
             <span className="text-[10px] text-slate-400 font-mono">Ctrl+K</span>
-          </button>
+          </a>
         </div>
 
         {/* Scrollable Presets & History */}
