@@ -5,6 +5,10 @@ Uses direct REST PostgREST API with fallback in-memory store for high reliabilit
 import os
 import datetime
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from typing import List, Dict, Any, Optional
 from models import SolveResult, ScenarioData, Directive
 
@@ -16,7 +20,7 @@ class DatabaseManager:
         self._local_history: List[Dict[str, Any]] = []
 
         if self.supabase_url and self.supabase_key and "your-project" not in self.supabase_url:
-            print(f"[DB] Supabase configured: {self.supabase_url}")
+            print(f"[DB] Supabase live integration active: {self.supabase_url}")
         else:
             print("[DB] Operating in local memory fallback mode.")
 
