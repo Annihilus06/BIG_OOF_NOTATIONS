@@ -69,7 +69,7 @@ export default function Sidebar({
               <Plus className="w-4 h-4 text-sky-400 group-hover:rotate-90 transition-transform duration-200" />
               <span>New optimization</span>
             </div>
-            <span className="text-[10px] text-slate-400 font-mono">?K</span>
+            <span className="text-[10px] text-slate-400 font-mono">Ctrl+K</span>
           </button>
         </div>
 

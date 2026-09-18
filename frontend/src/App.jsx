@@ -17,8 +17,24 @@ import {
   isValidOperatorPrompt
 } from './lib/api';
 
+function getTabFromUrl() {
+  const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
+  const hash = window.location.hash.toLowerCase();
+  
+  if (path === '/output' || path === '/results' || hash === '#/output' || hash === '#output' || hash === '#results') {
+    return 'dashboard';
+  }
+  if (path === '/schedule' || hash === '#/schedule' || hash === '#schedule') {
+    return 'schedule';
+  }
+  if (path === '/history' || hash === '#/history' || hash === '#history') {
+    return 'history';
+  }
+  return 'optimizer';
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('optimizer'); // 'optimizer' | 'dashboard' | 'schedule' | 'history'
+  const [activeTab, setActiveTab] = useState(getTabFromUrl()); // 'optimizer' (/) | 'dashboard' (/output) | 'schedule' (/schedule) | 'history' (/history)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [scenario, setScenario] = useState(DEFAULT_SCENARIOS.default);
   const [directives, setDirectives] = useState([]);
@@ -34,6 +50,26 @@ export default function App() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
+
+  const navigateTo = (tab, updateHistory = true) => {
+    setActiveTab(tab);
+    if (updateHistory) {
+      let path = '/';
+      if (tab === 'dashboard') path = '/output';
+      else if (tab === 'schedule') path = '/schedule';
+      else if (tab === 'history') path = '/history';
+      window.history.pushState({ tab }, '', path);
+    }
+  };
+
+  // Listen to browser Back/Forward buttons for distinct hyperlink navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveTab(getTabFromUrl());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Initial load: check health and fetch history
   useEffect(() => {
@@ -78,7 +114,7 @@ export default function App() {
     }
   };
 
-  // Run OR-Tools Optimization
+  // Run OR-Tools Optimization and navigate to /output URL!
   const handleRunOptimization = async () => {
     // If prompt has text, validate it first!
     if (operatorPrompt.trim().length > 0 && !isValidOperatorPrompt(operatorPrompt)) {
@@ -110,10 +146,10 @@ export default function App() {
       const updatedHistory = await fetchHistory();
       setHistoryList(updatedHistory);
 
-      showToast(`Optimal dispatch found! Saved ?${(res.savings_amount_bdt || res.savings_amount || 0).toFixed(2)} (+${res.savings_pct.toFixed(1)}%).`);
+      showToast(`Optimal dispatch found! Saved BDT ${(res.savings_amount_bdt || res.savings_amount || 0).toFixed(2)} (+${res.savings_pct.toFixed(1)}%).`);
       
-      // Transition to next page only on successful run
-      setActiveTab('dashboard');
+      // NAVIGATE TO DISTINCT HYPERLINK: /output
+      navigateTo('dashboard');
     } catch (err) {
       console.error('Optimization solve error:', err);
       showToast('Optimization failed. Check scenario constraints.');
@@ -127,7 +163,7 @@ export default function App() {
     setDirectives([]);
     setScenario(DEFAULT_SCENARIOS.default);
     setResult(null);
-    setActiveTab('optimizer');
+    navigateTo('optimizer'); // Navigates to /
   };
 
   const handleClearHistory = () => {
@@ -143,7 +179,7 @@ export default function App() {
       if (item.directives_applied) {
         setDirectives(item.directives_applied);
       }
-      setActiveTab('dashboard');
+      navigateTo('dashboard'); // Navigates to /output
       showToast(`Loaded scenario: ${item.scenario_name}`);
     }
   };
@@ -164,7 +200,7 @@ export default function App() {
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={navigateTo}
         onNewOptimization={handleNewOptimization}
         scenario={scenario}
         setScenario={setScenario}
@@ -178,7 +214,7 @@ export default function App() {
       {/* Main Content Area */}
       <div className={`flex-1 flex flex-col min-h-screen transition-all duration-200 ${isSidebarOpen ? 'lg:pl-64' : 'pl-0'}`}>
         
-        {/* Top Minimalist Navigation Bar */}
+        {/* Top Minimalist Navigation Bar with Distinct Hyperlinks */}
         <header className="sticky top-0 z-30 h-14 bg-[#111111]/90 backdrop-blur-md border-b border-[#222222] px-4 flex items-center justify-between">
           
           {/* Left: Sidebar Toggle & New Optimization icon */}
@@ -193,45 +229,61 @@ export default function App() {
               </button>
             )}
 
-            <button
-              onClick={handleNewOptimization}
+            <a
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                handleNewOptimization();
+              }}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#212121] hover:bg-[#2c2c2c] text-slate-200 text-xs font-medium border border-[#2f2f2f] transition-all cursor-pointer"
-              title="New Optimization"
+              title="New Optimization Prompt"
             >
               <Plus className="w-3.5 h-3.5 text-sky-400" />
               <span>New Optimization</span>
-            </button>
+            </a>
           </div>
 
-          {/* Center: View Switcher */}
-          <div className="flex items-center p-1 rounded-full bg-[#1c1c1c] border border-[#2e2e2e] text-xs">
-            <button
-              onClick={() => setActiveTab('optimizer')}
+          {/* Center: View Switcher Links */}
+          <nav className="flex items-center p-1 rounded-full bg-[#1c1c1c] border border-[#2e2e2e] text-xs">
+            <a
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('optimizer');
+              }}
               className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                 activeTab === 'optimizer' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Prompt Console
-            </button>
+              Input Console
+            </a>
 
-            <button
-              onClick={() => setActiveTab('dashboard')}
+            <a
+              href="/output"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('dashboard');
+              }}
               className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                 activeTab === 'dashboard' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Telemetry & Graphs
-            </button>
+              Output & Graphs
+            </a>
 
-            <button
-              onClick={() => setActiveTab('schedule')}
+            <a
+              href="/schedule"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('schedule');
+              }}
               className={`hidden sm:inline-block px-3 py-1 rounded-full transition-all cursor-pointer ${
                 activeTab === 'schedule' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
               24h Schedule
-            </button>
-          </div>
+            </a>
+          </nav>
 
           {/* Right Status Indicator */}
           <div className="flex items-center space-x-2">
@@ -246,7 +298,7 @@ export default function App() {
         {/* Page Content Router */}
         <main className="flex-1 flex flex-col px-4 sm:px-6 py-4">
           
-          {/* PAGE 1: CHATGPT-STYLE PROMPT VIEW */}
+          {/* PAGE 1: CHATGPT-STYLE INPUT PROMPT VIEW (URL: /) */}
           {activeTab === 'optimizer' && (
             <ChatPromptView
               scenario={scenario}
@@ -263,16 +315,16 @@ export default function App() {
             />
           )}
 
-          {/* PAGE 2: TELEMETRY, ANALYTICS OUTPUTS & GRAPHS */}
+          {/* PAGE 2: TELEMETRY, ANALYTICS OUTPUTS & GRAPHS (URL: /output) */}
           {activeTab === 'dashboard' && (
             <ResultsDashboard 
               result={result} 
-              onBackToConsole={() => setActiveTab('optimizer')}
+              onBackToConsole={() => navigateTo('optimizer')}
               onNewRun={handleNewOptimization}
             />
           )}
 
-          {/* PAGE 3: 24-HOUR DISPATCH SCHEDULE MATRIX */}
+          {/* PAGE 3: 24-HOUR DISPATCH SCHEDULE MATRIX (URL: /schedule) */}
           {activeTab === 'schedule' && (
             <div className="max-w-7xl w-full mx-auto space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
@@ -281,7 +333,7 @@ export default function App() {
                   <p className="text-xs text-slate-400">Complete hourly SCADA power matrix and pricing</p>
                 </div>
                 <button
-                  onClick={() => setActiveTab('dashboard')}
+                  onClick={() => navigateTo('dashboard')}
                   className="text-xs text-sky-400 hover:underline font-mono"
                 >
                   [VIEW GRAPHS ?]
@@ -291,7 +343,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAGE 4: AUDIT LOG / HISTORY */}
+          {/* PAGE 4: AUDIT LOG / HISTORY (URL: /history) */}
           {activeTab === 'history' && (
             <div className="max-w-7xl w-full mx-auto space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
