@@ -1,10 +1,9 @@
 [build]
-  command = "npm run build"
+  command = "cd frontend && npm install --no-package-lock && npm run build"
   publish = "frontend/dist"
 
 [build.environment]
   NODE_VERSION = "20"
-  NPM_FLAGS = "--include=optional"
 
 [[redirects]]
   from = "/*"

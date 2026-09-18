@@ -1,5 +1,6 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
+package-lock.json
 backend/__pycache__/
 __pycache__/
 *.pyc
