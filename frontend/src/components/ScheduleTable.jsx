@@ -1,16 +1,20 @@
-﻿import React, { useState } from 'react';
-import { Download, Table, Filter, Clock, Zap, Sun, Battery, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Table, Search } from 'lucide-react';
+import { Card, CardHeader, CardContent } from './ui/Card';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
+import { Input } from './ui/Input';
 
 export default function ScheduleTable({ result }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   if (!result || !result.hourly_schedule || result.hourly_schedule.length === 0) {
     return (
-      <div className="bg-[#0f1422] border border-[#1e273c] rounded-xl p-12 text-center">
-        <Table className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-        <h3 className="text-sm font-bold text-white font-mono">NO DISPATCH DATA</h3>
-        <p className="text-xs text-slate-400 mt-1">Execute solver in Operator Terminal to generate hourly telemetry.</p>
-      </div>
+      <Card className="p-12 text-center">
+        <Table className="w-10 h-10 text-[#94A3B8] mx-auto mb-3" />
+        <h3 className="text-[16px] font-semibold text-[#F9FAFB]">No Dispatch Data Available</h3>
+        <p className="text-[14px] text-[#94A3B8] mt-1">Execute solver in Operator Console to generate hourly dispatch.</p>
+      </Card>
     );
   }
 
@@ -69,129 +73,132 @@ export default function ScheduleTable({ result }) {
   });
 
   return (
-    <div className="bg-[#0f1422] border border-[#1e273c] rounded-xl p-5 shadow-sm space-y-4">
-      
+    <Card className="space-y-4">
       {/* Table Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#1b2336] gap-3">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 font-mono">
-            <Table className="w-4 h-4 text-sky-400" />
-            24-HOUR ENERGY DISPATCH MATRIX (SCADA SCHEDULE)
+          <h2 className="text-[16px] font-semibold text-[#F9FAFB] flex items-center gap-2">
+            <Table className="w-4 h-4 text-[#2563EB]" />
+            24-Hour Energy Dispatch Schedule Matrix
           </h2>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-[12px] text-[#94A3B8] mt-0.5">
             Optimal hour-by-hour power allocation, battery states, and cost breakdown.
           </p>
         </div>
 
         <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            placeholder="Search hour or constraint..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-2.5 py-1.5 bg-[#090c14] rounded-md border border-[#222c42] text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500"
-          />
+          <div className="w-48 sm:w-64">
+            <Input
+              type="text"
+              placeholder="Filter by time or directive..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="py-1.5 text-[12px]"
+            />
+          </div>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={exportCSV}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-[#172238] hover:bg-[#202f4e] text-sky-300 border border-[#26375c] transition font-mono"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>EXPORT CSV</span>
-          </button>
+            <span>Export CSV</span>
+          </Button>
         </div>
-      </div>
+      </CardHeader>
 
-      {/* High Density Table */}
-      <div className="overflow-x-auto rounded-lg border border-[#1b2336]">
-        <table className="w-full text-left text-xs font-mono">
-          <thead className="bg-[#0a0d16] text-slate-400 uppercase text-[10px] tracking-wider border-b border-[#1b2336]">
-            <tr>
-              <th className="px-3 py-2.5">TIME</th>
-              <th className="px-3 py-2.5 text-right">DEMAND</th>
-              <th className="px-3 py-2.5 text-right text-amber-400">SOLAR (AV/USE)</th>
-              <th className="px-3 py-2.5 text-right text-emerald-400">BATT (CHG/DIS)</th>
-              <th className="px-3 py-2.5 text-right text-sky-400">SOC (%)</th>
-              <th className="px-3 py-2.5 text-right text-rose-400">GRID IMPORT</th>
-              <th className="px-3 py-2.5 text-right">TARIFF</th>
-              <th className="px-3 py-2.5 text-right">COST ($)</th>
-              <th className="px-3 py-2.5">CONSTRAINTS / DIRECTIVES</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#172033] bg-[#0c101a]">
-            {filtered.map((row) => {
-              const hasDirectives = row.active_directives && row.active_directives.length > 0;
-              return (
-                <tr
-                  key={row.hour}
-                  className={`hover:bg-[#131b2e] transition ${hasDirectives ? 'bg-[#101729]' : ''}`}
-                >
-                  <td className="px-3 py-2 font-bold text-white">
-                    {row.time_label}
-                  </td>
+      {/* Enterprise Table */}
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[13px] font-mono">
+            <thead className="sticky top-0 bg-[#0B1220] text-[#94A3B8] uppercase text-[11px] font-semibold tracking-wider border-b border-[#374151]">
+              <tr>
+                <th className="px-4 py-3">Time</th>
+                <th className="px-3 py-3 text-right">Demand</th>
+                <th className="px-3 py-3 text-right text-[#EAB308]">Solar (Avail/Used)</th>
+                <th className="px-3 py-3 text-right text-[#22C55E]">Battery (Chg/Dis)</th>
+                <th className="px-3 py-3 text-right text-[#60A5FA]">SOC (%)</th>
+                <th className="px-3 py-3 text-right text-[#F87171]">Grid Import</th>
+                <th className="px-3 py-3 text-right text-[#94A3B8]">Tariff</th>
+                <th className="px-3 py-3 text-right">Cost ($)</th>
+                <th className="px-4 py-3">Directives</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1F2937]">
+              {filtered.map((row, index) => {
+                const isEven = index % 2 === 0;
+                const hasDirectives = row.active_directives && row.active_directives.length > 0;
+                return (
+                  <tr
+                    key={row.hour}
+                    className={`transition-colors hover:bg-[#1F2937]/60 ${
+                      isEven ? 'bg-[#111827]' : 'bg-[#0E1524]'
+                    } ${hasDirectives ? 'bg-[#1E293B]/40' : ''}`}
+                  >
+                    <td className="px-4 py-2.5 font-bold text-[#F9FAFB]">
+                      {row.time_label}
+                    </td>
 
-                  <td className="px-3 py-2 text-right text-slate-300">
-                    {row.load_kwh.toFixed(1)} kW
-                  </td>
+                    <td className="px-3 py-2.5 text-right text-[#CBD5E1]">
+                      {row.load_kwh.toFixed(1)} kW
+                    </td>
 
-                  <td className="px-3 py-2 text-right text-amber-300">
-                    {row.solar_available_kwh.toFixed(1)} / <span className="font-bold text-amber-400">{row.solar_used_kwh.toFixed(1)}</span>
-                  </td>
+                    <td className="px-3 py-2.5 text-right text-[#FDE047]">
+                      {row.solar_available_kwh.toFixed(1)} / <span className="font-bold text-[#EAB308]">{row.solar_used_kwh.toFixed(1)}</span>
+                    </td>
 
-                  <td className="px-3 py-2 text-right">
-                    {row.battery_charge_kwh > 0 ? (
-                      <span className="text-emerald-400 font-bold">+{row.battery_charge_kwh.toFixed(1)} kW</span>
-                    ) : row.battery_discharge_kwh > 0 ? (
-                      <span className="text-sky-400 font-bold">-{row.battery_discharge_kwh.toFixed(1)} kW</span>
-                    ) : (
-                      <span className="text-slate-600">0.0</span>
-                    )}
-                  </td>
+                    <td className="px-3 py-2.5 text-right">
+                      {row.battery_charge_kwh > 0 ? (
+                        <span className="text-[#22C55E] font-semibold">+{row.battery_charge_kwh.toFixed(1)} kW</span>
+                      ) : row.battery_discharge_kwh > 0 ? (
+                        <span className="text-[#60A5FA] font-semibold">-{row.battery_discharge_kwh.toFixed(1)} kW</span>
+                      ) : (
+                        <span className="text-[#64748B]">0.0</span>
+                      )}
+                    </td>
 
-                  <td className="px-3 py-2 text-right">
-                    <span className="font-bold text-white">{row.battery_soc_pct.toFixed(0)}%</span>
-                    <span className="text-[10px] text-slate-500 block">({row.battery_soc_kwh.toFixed(1)} kWh)</span>
-                  </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <span className="font-semibold text-[#F9FAFB]">{row.battery_soc_pct.toFixed(0)}%</span>
+                      <span className="text-[10px] text-[#94A3B8] block">({row.battery_soc_kwh.toFixed(1)} kWh)</span>
+                    </td>
 
-                  <td className="px-3 py-2 text-right">
-                    {row.grid_import_kwh > 0 ? (
-                      <span className="text-rose-400 font-bold">{row.grid_import_kwh.toFixed(1)} kW</span>
-                    ) : (
-                      <span className="text-slate-600">0.0</span>
-                    )}
-                  </td>
+                    <td className="px-3 py-2.5 text-right">
+                      {row.grid_import_kwh > 0 ? (
+                        <span className="text-[#F87171] font-semibold">{row.grid_import_kwh.toFixed(1)} kW</span>
+                      ) : (
+                        <span className="text-[#64748B]">0.0</span>
+                      )}
+                    </td>
 
-                  <td className="px-3 py-2 text-right text-slate-400">
-                    ${row.tariff_per_kwh.toFixed(2)}
-                  </td>
+                    <td className="px-3 py-2.5 text-right text-[#94A3B8]">
+                      ${row.tariff_per_kwh.toFixed(2)}
+                    </td>
 
-                  <td className="px-3 py-2 text-right font-bold text-white">
-                    ${row.hourly_cost.toFixed(3)}
-                  </td>
+                    <td className="px-3 py-2.5 text-right font-bold text-[#F9FAFB]">
+                      ${row.hourly_cost.toFixed(3)}
+                    </td>
 
-                  <td className="px-3 py-2">
-                    {hasDirectives ? (
-                      <div className="flex flex-wrap gap-1 font-sans">
-                        {row.active_directives.map((dir, i) => (
-                          <span
-                            key={i}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#162238] text-sky-300 border border-[#233557]"
-                          >
-                            {dir}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-slate-600 text-[10px]">NOMINAL</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-    </div>
+                    <td className="px-4 py-2.5">
+                      {hasDirectives ? (
+                        <div className="flex flex-wrap gap-1 font-sans">
+                          {row.active_directives.map((dir, i) => (
+                            <Badge key={i} variant="primary">
+                              {dir}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[#64748B] text-[11px]">Nominal</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

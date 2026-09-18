@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import OptimizationConsole from './components/OptimizationConsole';
@@ -52,7 +52,7 @@ export default function App() {
     init();
   }, []);
 
-  // Parse natural language directives via Gemini
+  // Parse directives via Gemini
   const handleParseDirectives = async (promptText) => {
     if (!promptText || !promptText.trim()) return;
     setIsParsingDirectives(true);
@@ -117,7 +117,7 @@ export default function App() {
       const updatedHistory = await fetchHistory();
       setHistoryList(updatedHistory);
 
-      showToast(`Cloud contingency simulated! Saved $${res.savings_amount.toFixed(2)}.`);
+      showToast(`Solar contingency simulated! Saved $${res.savings_amount.toFixed(2)}.`);
       setActiveTab('dashboard');
     } catch (err) {
       console.error('Quick run error:', err);
@@ -135,17 +135,17 @@ export default function App() {
         setDirectives(item.directives_applied);
       }
       setActiveTab('dashboard');
-      showToast(`Loaded historical dispatch: ${item.scenario_name}`);
+      showToast(`Loaded historical record: ${item.scenario_name}`);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#080b12] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#0B1220] text-[#F9FAFB] flex flex-col font-sans">
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 px-3.5 py-2.5 rounded-lg border border-[#2d3f66] bg-[#0c1220] text-xs font-mono text-sky-200 shadow-2xl flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-sky-400" />
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-[10px] border border-[#374151] bg-[#111827] text-[13px] text-[#F9FAFB] shadow-lg flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -159,13 +159,12 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
         
         {/* Context Bar */}
         <HeroSection
           scenario={scenario}
           onQuickRun={handleQuickRun}
-          onOpenArchModal={() => setIsArchModalOpen(true)}
         />
 
         {/* Tab Content */}
@@ -184,18 +183,18 @@ export default function App() {
               isParsingDirectives={isParsingDirectives}
             />
 
-            {/* Quick Results Preview Below Terminal */}
+            {/* Latest Result Summary */}
             {result && (
-              <div className="pt-4 border-t border-[#182236] space-y-3">
+              <div className="pt-2 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider">
-                    Latest Solved Telemetry Preview
+                  <h3 className="text-[14px] font-semibold text-[#94A3B8] uppercase tracking-wider">
+                    Latest Solved Dispatch Overview
                   </h3>
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className="text-xs text-sky-400 hover:underline font-mono"
+                    className="text-[13px] text-[#2563EB] hover:underline font-medium cursor-pointer"
                   >
-                    [OPEN FULL TELEMETRY CHARTS →]
+                    View Complete Analytics Charts →
                   </button>
                 </div>
                 <ResultsDashboard result={result} />
@@ -228,10 +227,10 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer className="border-t border-[#161d2d] bg-[#070a12] py-4 text-center text-xs text-slate-500 font-mono">
+      <footer className="border-t border-[#374151] bg-[#111827] py-4 text-center text-[12px] text-[#94A3B8]">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>GridWise OS – Industrial Energy Optimization & Microgrid SCADA Platform</span>
-          <span className="text-slate-400">ENGINE: <strong>Google OR-Tools (LP/GLOP)</strong> | NLP: <strong>Gemini 1.5 Flash</strong></span>
+          <span>GridWise AI – Enterprise Energy Management Platform</span>
+          <span>Engine: <strong className="text-[#F9FAFB]">Google OR-Tools</strong> | NLP: <strong className="text-[#F9FAFB]">Gemini Flash</strong></span>
         </div>
       </footer>
 

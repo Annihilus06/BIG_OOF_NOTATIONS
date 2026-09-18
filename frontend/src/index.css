@@ -1,63 +1,51 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 @layer base {
   :root {
-    --bg-primary: #0a0d14;
-    --bg-surface: #10141f;
-    --bg-surface-elevated: #161b2a;
-    --border-subtle: #1e2638;
-    --border-strong: #2a364f;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --bg: #0B1220;
+    --surface: #111827;
+    --surface-elevated: #1F2937;
+    --border: #374151;
+    --primary: #2563EB;
+    --primary-hover: #1D4ED8;
+    --success: #16A34A;
+    --warning: #D97706;
+    --danger: #DC2626;
+    --text-primary: #F9FAFB;
+    --text-secondary: #CBD5E1;
+    --text-muted: #94A3B8;
   }
 
   body {
-    background-color: var(--bg-primary);
+    background-color: var(--bg);
     color: var(--text-primary);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    letter-spacing: -0.01em;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: normal;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
 }
 
-/* Industrial Precision UI Styles */
-.panel-industrial {
-  background-color: #101522;
-  border: 1px solid #1e2638;
-}
-
-.panel-industrial-elevated {
-  background-color: #151b2c;
-  border: 1px solid #28334b;
-}
-
-.mono-num {
+/* Data & Numbers */
+.font-mono-num {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-feature-settings: "tnum" 1, "zero" 1;
 }
 
-/* Subtle micro-grid background pattern for data charts */
-.grid-bg-pattern {
-  background-size: 24px 24px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-}
-
-/* Custom Clean Scrollbars */
+/* Clean Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0d14;
+  background: #0B1220;
 }
 ::-webkit-scrollbar-thumb {
-  background: #252e42;
-  border-radius: 3px;
+  background: #374151;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #374463;
+  background: #4B5563;
 }
