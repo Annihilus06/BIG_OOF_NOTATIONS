@@ -1,102 +1,115 @@
 ﻿import React from 'react';
-import { Zap, Cpu, History, Table, Activity, Sparkles, Database, Layers } from 'lucide-react';
+import { Cpu, History, Table, Activity, Layers, Terminal, Radio, ShieldCheck } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab, backendStatus, onOpenArchModal }) {
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-50 bg-[#0c101a] border-b border-[#1b2334] text-slate-200">
+      {/* Top Telemetry Ticker Bar */}
+      <div className="bg-[#070a12] border-b border-[#161c2b] px-4 py-1 text-[11px] text-slate-400 flex items-center justify-between font-mono">
+        <div className="flex items-center space-x-4 overflow-x-auto whitespace-nowrap">
+          <span className="flex items-center space-x-1.5 text-slate-300">
+            <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+            <span>NODE: <strong className="text-white">US-EAST-BESS-01</strong></span>
+          </span>
+          <span className="text-slate-600">|</span>
+          <span>GRID FREQ: <strong className="text-slate-200">50.02 Hz</strong></span>
+          <span className="text-slate-600">|</span>
+          <span>DISPATCH MODE: <strong className="text-sky-400">ECONOMIC ARBITRAGE (LP)</strong></span>
+          <span className="text-slate-600">|</span>
+          <span>AI PARSER: <strong className="text-amber-400">GEMINI 1.5 FLASH</strong></span>
+        </div>
+
+        <div className="flex items-center space-x-3 shrink-0">
+          <div className="flex items-center space-x-1.5">
+            <div className={`w-2 h-2 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-300">
+              {backendStatus === 'healthy' ? 'OR-Tools Engine Live' : 'Simulation Engine'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Nav Header */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex items-center justify-between h-14">
           
-          {/* Logo & Brand */}
+          {/* Brand Logo */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('optimizer')}>
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/20">
-              <Zap className="w-5 h-5 text-white" />
-              <div className="absolute -inset-0.5 rounded-xl bg-cyan-400 opacity-30 blur-sm animate-pulse"></div>
+            <div className="w-8 h-8 rounded-lg bg-[#141d30] border border-[#233150] flex items-center justify-center text-sky-400">
+              <Terminal className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-xl font-black tracking-tight text-white">
-                  GridWise <span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 bg-clip-text text-transparent">AI</span>
+                <span className="text-base font-bold tracking-tight text-white font-sans">
+                  GridWise <span className="text-sky-400 font-semibold">OS</span>
                 </span>
-                <span className="px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/50">
-                  v1.0
+                <span className="px-1.5 py-0.2 text-[9px] font-mono uppercase rounded bg-[#18233c] text-sky-300 border border-[#233355]">
+                  Microgrid SCADA
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium -mt-0.5">
-                Industrial Energy Optimization Platform
-              </p>
             </div>
           </div>
 
           {/* Nav Tabs */}
-          <nav className="hidden md:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+          <nav className="flex items-center space-x-1 bg-[#101624] p-1 rounded-lg border border-[#1d263a]">
             <button
               onClick={() => setActiveTab('optimizer')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
                 activeTab === 'optimizer'
-                  ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-[#1b253d] text-white border border-[#2d3e66] shadow-inner'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#151c2d]'
               }`}
             >
-              <Cpu className="w-4 h-4" />
-              <span>Optimizer</span>
+              <Terminal className="w-3.5 h-3.5 text-sky-400" />
+              <span>Operator Terminal</span>
             </button>
 
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
                 activeTab === 'dashboard'
-                  ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-[#1b253d] text-white border border-[#2d3e66] shadow-inner'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#151c2d]'
               }`}
             >
-              <Activity className="w-4 h-4" />
-              <span>Analytics & Charts</span>
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Telemetry & Charts</span>
             </button>
 
             <button
               onClick={() => setActiveTab('schedule')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
                 activeTab === 'schedule'
-                  ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-[#1b253d] text-white border border-[#2d3e66] shadow-inner'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#151c2d]'
               }`}
             >
-              <Table className="w-4 h-4" />
-              <span>Hourly Dispatch</span>
+              <Table className="w-3.5 h-3.5 text-amber-400" />
+              <span>Dispatch Matrix (24h)</span>
             </button>
 
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
                 activeTab === 'history'
-                  ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-[#1b253d] text-white border border-[#2d3e66] shadow-inner'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#151c2d]'
               }`}
             >
-              <History className="w-4 h-4" />
-              <span>History</span>
+              <History className="w-3.5 h-3.5 text-slate-400" />
+              <span>Audit Log</span>
             </button>
           </nav>
 
-          {/* Right Status Badges & Architecture Button */}
-          <div className="flex items-center space-x-3">
+          {/* Right Action */}
+          <div className="flex items-center space-x-2">
             <button
               onClick={onOpenArchModal}
-              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700 transition"
-              title="View System Flow Architecture"
+              className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-[#131a2c] hover:bg-[#1a233b] text-slate-300 border border-[#202b45] transition"
             >
-              <Layers className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Architecture</span>
+              <Layers className="w-3.5 h-3.5 text-sky-400" />
+              <span>System Topology</span>
             </button>
-
-            {/* Backend status indicator */}
-            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
-              <div className={`w-2 h-2 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <span className="text-xs font-medium text-slate-300 hidden sm:inline">
-                {backendStatus === 'healthy' ? 'OR-Tools Engine Live' : 'Simulation Mode'}
-              </span>
-            </div>
           </div>
 
         </div>

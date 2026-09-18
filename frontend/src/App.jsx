@@ -30,10 +30,10 @@ export default function App() {
 
   const showToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Check health and load initial optimization
+  // Initial load
   useEffect(() => {
     async function init() {
       const health = await checkBackendHealth();
@@ -42,9 +42,8 @@ export default function App() {
       const history = await fetchHistory();
       setHistoryList(history);
 
-      // Perform initial benchmark solve so graphs are populated immediately
       try {
-        const initialRes = await runOptimization(DEFAULT_SCENARIOS.default, [], 'Benchmark initial run');
+        const initialRes = await runOptimization(DEFAULT_SCENARIOS.default, [], 'Initial benchmark baseline');
         setResult(initialRes);
       } catch (e) {
         console.error('Initial solve error:', e);
@@ -53,7 +52,7 @@ export default function App() {
     init();
   }, []);
 
-  // Parse natural language operator notes via Gemini
+  // Parse natural language directives via Gemini
   const handleParseDirectives = async (promptText) => {
     if (!promptText || !promptText.trim()) return;
     setIsParsingDirectives(true);
@@ -61,23 +60,22 @@ export default function App() {
       const res = await parseNaturalLanguagePrompt(promptText);
       if (res && res.directives) {
         setDirectives(res.directives);
-        showToast(`Parsed ${res.directives.length} operational directive(s) via Gemini Flash.`);
+        showToast(`Parsed ${res.directives.length} directive(s) via Gemini Flash.`);
       }
     } catch (err) {
       console.error('Parse error:', err);
-      showToast('Failed to parse directives.');
+      showToast('Directive parsing failed.');
     } finally {
       setIsParsingDirectives(false);
     }
   };
 
-  // Run full Google OR-Tools optimization
+  // Run OR-Tools Optimization
   const handleRunOptimization = async () => {
     setIsLoading(true);
     try {
       let currentDirectives = directives;
       
-      // If user typed a prompt but hasn't explicitly clicked "Parse", parse it first
       if (operatorPrompt.trim() && directives.length === 0) {
         const parsedRes = await parseNaturalLanguagePrompt(operatorPrompt);
         if (parsedRes && parsedRes.directives) {
@@ -90,11 +88,10 @@ export default function App() {
       setResult(res);
       saveLocalHistory(res, scenario, currentDirectives, operatorPrompt);
       
-      // Refresh history
       const updatedHistory = await fetchHistory();
       setHistoryList(updatedHistory);
 
-      showToast(`Optimization completed! Saved $${res.savings_amount.toFixed(2)} (${res.savings_pct.toFixed(1)}%).`);
+      showToast(`Optimal dispatch found! Saved $${res.savings_amount.toFixed(2)} (+${res.savings_pct.toFixed(1)}%).`);
       setActiveTab('dashboard');
     } catch (err) {
       console.error('Optimization run error:', err);
@@ -104,7 +101,7 @@ export default function App() {
     }
   };
 
-  // Quick Run from Hero section
+  // Quick Run
   const handleQuickRun = async (presetPrompt) => {
     setOperatorPrompt(presetPrompt);
     setIsLoading(true);
@@ -120,7 +117,7 @@ export default function App() {
       const updatedHistory = await fetchHistory();
       setHistoryList(updatedHistory);
 
-      showToast(`Simulated solar reduction scenario! Saved $${res.savings_amount.toFixed(2)}.`);
+      showToast(`Cloud contingency simulated! Saved $${res.savings_amount.toFixed(2)}.`);
       setActiveTab('dashboard');
     } catch (err) {
       console.error('Quick run error:', err);
@@ -129,7 +126,7 @@ export default function App() {
     }
   };
 
-  // Reload past history item into result dashboard
+  // Select History
   const handleSelectHistoryItem = (item) => {
     if (item.hourly_schedule) {
       setResult(item);
@@ -138,22 +135,22 @@ export default function App() {
         setDirectives(item.directives_applied);
       }
       setActiveTab('dashboard');
-      showToast(`Loaded optimization: ${item.scenario_name}`);
+      showToast(`Loaded historical dispatch: ${item.scenario_name}`);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white">
+    <div className="min-h-screen bg-[#080b12] text-slate-100 flex flex-col font-sans">
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 glass-panel-glow px-4 py-3 rounded-xl border border-cyan-500/40 text-xs font-semibold text-cyan-200 shadow-2xl flex items-center space-x-2 animate-bounce">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+        <div className="fixed bottom-5 right-5 z-50 px-3.5 py-2.5 rounded-lg border border-[#2d3f66] bg-[#0c1220] text-xs font-mono text-sky-200 shadow-2xl flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-sky-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Top Navigation */}
+      {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -161,18 +158,19 @@ export default function App() {
         onOpenArchModal={() => setIsArchModalOpen(true)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
         
-        {/* Hero Section */}
+        {/* Context Bar */}
         <HeroSection
+          scenario={scenario}
           onQuickRun={handleQuickRun}
           onOpenArchModal={() => setIsArchModalOpen(true)}
         />
 
         {/* Tab Content */}
         {activeTab === 'optimizer' && (
-          <div className="space-y-8 animate-fadeIn">
+          <div className="space-y-6">
             <OptimizationConsole
               scenario={scenario}
               setScenario={setScenario}
@@ -186,16 +184,18 @@ export default function App() {
               isParsingDirectives={isParsingDirectives}
             />
 
-            {/* Live Results Preview Below Console */}
+            {/* Quick Results Preview Below Terminal */}
             {result && (
-              <div className="pt-6 border-t border-slate-800/80">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-bold text-white">Latest Optimal Dispatch Summary</h3>
+              <div className="pt-4 border-t border-[#182236] space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider">
+                    Latest Solved Telemetry Preview
+                  </h3>
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className="text-xs font-semibold text-cyan-400 hover:underline"
+                    className="text-xs text-sky-400 hover:underline font-mono"
                   >
-                    View Full Interactive Charts →
+                    [OPEN FULL TELEMETRY CHARTS →]
                   </button>
                 </div>
                 <ResultsDashboard result={result} />
@@ -205,24 +205,18 @@ export default function App() {
         )}
 
         {activeTab === 'dashboard' && (
-          <div className="animate-fadeIn">
-            <ResultsDashboard result={result} />
-          </div>
+          <ResultsDashboard result={result} />
         )}
 
         {activeTab === 'schedule' && (
-          <div className="animate-fadeIn">
-            <ScheduleTable result={result} />
-          </div>
+          <ScheduleTable result={result} />
         )}
 
         {activeTab === 'history' && (
-          <div className="animate-fadeIn">
-            <HistoryView
-              historyList={historyList}
-              onSelectHistoryItem={handleSelectHistoryItem}
-            />
-          </div>
+          <HistoryView
+            historyList={historyList}
+            onSelectHistoryItem={handleSelectHistoryItem}
+          />
         )}
 
       </main>
@@ -234,10 +228,10 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer className="glass-panel border-t border-slate-800/80 mt-12 py-6 text-center text-xs text-slate-500">
+      <footer className="border-t border-[#161d2d] bg-[#070a12] py-4 text-center text-xs text-slate-500 font-mono">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>GridWise AI – Enterprise Energy Optimization & Microgrid Dispatch Platform</span>
-          <span className="text-slate-400">Powered by <strong>Gemini Flash</strong> + <strong>Google OR-Tools</strong> + <strong>Supabase</strong></span>
+          <span>GridWise OS – Industrial Energy Optimization & Microgrid SCADA Platform</span>
+          <span className="text-slate-400">ENGINE: <strong>Google OR-Tools (LP/GLOP)</strong> | NLP: <strong>Gemini 1.5 Flash</strong></span>
         </div>
       </footer>
 
