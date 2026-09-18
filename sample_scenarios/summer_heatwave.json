@@ -1,0 +1,37 @@
+﻿{
+  "name": "Summer Heatwave & AC Spikes",
+  "description": "High evening air-conditioning demand with aggressive peak pricing between 4 PM and 9 PM.",
+  "battery_capacity_kwh": 30.0,
+  "max_charge_kw": 8.0,
+  "max_discharge_kw": 8.0,
+  "initial_soc_kwh": 12.0,
+  "final_soc_target_kwh": 10.0,
+  "battery_efficiency": 0.95,
+  "min_soc_pct": 0.10,
+  "max_soc_pct": 0.95,
+  "degradation_cost_per_kwh": 0.005,
+  "load_profile": [
+    4.5, 4.0, 3.8, 3.8, 4.2, 5.5,
+    9.0, 14.5, 18.0, 21.0, 23.5, 25.0,
+    26.2, 27.0, 26.5, 25.8, 28.0, 29.5,
+    27.0, 23.0, 18.5, 13.0, 8.5, 6.0
+  ],
+  "solar_profile": [
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.5,
+    3.0, 8.0, 15.0, 22.0, 27.0, 29.0,
+    28.5, 25.0, 20.0, 13.0, 6.0, 1.5,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+  ],
+  "tariff_profile": [
+    0.14, 0.14, 0.14, 0.14, 0.14, 0.16,
+    0.20, 0.26, 0.28, 0.26, 0.22, 0.20,
+    0.20, 0.24, 0.30, 0.40, 0.52, 0.58,
+    0.58, 0.50, 0.42, 0.28, 0.18, 0.14
+  ],
+  "feed_in_tariff": [
+    0.06, 0.06, 0.06, 0.06, 0.06, 0.06,
+    0.06, 0.06, 0.06, 0.06, 0.06, 0.06,
+    0.06, 0.06, 0.06, 0.06, 0.06, 0.06,
+    0.06, 0.06, 0.06, 0.06, 0.06, 0.06
+  ]
+}

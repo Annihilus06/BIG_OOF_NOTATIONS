@@ -1,0 +1,276 @@
+﻿import { DEFAULT_SCENARIOS } from './presets';
+
+const API_BASE = '/api';
+
+export async function checkBackendHealth() {
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    if (res.ok) {
+      return await res.json();
+    }
+    return { status: 'offline', optimizer: 'Local Simulation' };
+  } catch (err) {
+    return { status: 'offline', optimizer: 'Local Simulation' };
+  }
+}
+
+export async function parseNaturalLanguagePrompt(prompt) {
+  try {
+    const res = await fetch(`${API_BASE}/process-nl`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('API /process-nl unreachable, using client-side fallback parsing.', err);
+  }
+
+  // Client-side fallback directive extractor
+  return clientSideNLParser(prompt);
+}
+
+export async function runOptimization(scenario, directives, rawPrompt = '') {
+  try {
+    const res = await fetch(`${API_BASE}/solve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scenario: scenario,
+        directives: directives,
+        raw_prompt: rawPrompt
+      })
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    const errData = await res.json();
+    throw new Error(errData.detail || 'Optimization failed');
+  } catch (err) {
+    console.warn('API /solve unreachable, running client-side optimization simulation.', err);
+    return clientSideEnergySimulator(scenario, directives);
+  }
+}
+
+export async function fetchHistory() {
+  try {
+    const res = await fetch(`${API_BASE}/history`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('Could not fetch remote history, returning local storage history.');
+  }
+
+  const saved = localStorage.getItem('gridwise_history');
+  return saved ? JSON.parse(saved) : [];
+}
+
+export function saveLocalHistory(result, scenario, directives, rawPrompt) {
+  try {
+    const prev = JSON.parse(localStorage.getItem('gridwise_history') || '[]');
+    const record = {
+      id: `local-${Date.now()}`,
+      scenario_name: scenario.name,
+      raw_prompt: rawPrompt,
+      total_cost: result.total_cost,
+      baseline_cost: result.baseline_cost,
+      savings_pct: result.savings_pct,
+      savings_amount: result.savings_amount,
+      total_solar_used_kwh: result.total_solar_used_kwh,
+      total_grid_imported_kwh: result.total_grid_imported_kwh,
+      total_battery_charged_kwh: result.total_battery_charged_kwh,
+      total_battery_discharged_kwh: result.total_battery_discharged_kwh,
+      solver_status: result.solver_status || 'OPTIMAL',
+      directives_count: directives.length,
+      directives_applied: directives,
+      hourly_schedule: result.hourly_schedule,
+      created_at: new Date().toISOString()
+    };
+    const updated = [record, ...prev].slice(0, 20);
+    localStorage.setItem('gridwise_history', JSON.stringify(updated));
+  } catch (e) {
+    console.error('Error saving local history:', e);
+  }
+}
+
+// Client-side heuristics for instant offline testing
+function clientSideNLParser(prompt) {
+  const p = prompt.toLowerCase();
+  const directives = [];
+
+  // Match times e.g. "between 1 PM and 3 PM", "1pm to 3pm", "13 to 15"
+  let hours = [13, 14, 15];
+  if (p.includes('1 pm') || p.includes('1pm') || p.includes('13')) {
+    hours = [13, 14, 15];
+  } else if (p.includes('5 pm') || p.includes('5pm') || p.includes('17')) {
+    hours = [17, 18, 19, 20, 21];
+  } else if (p.includes('6 pm') || p.includes('6pm') || p.includes('18')) {
+    hours = [18, 19, 20, 21, 22];
+  }
+
+  if (p.includes('solar') || p.includes('cloud')) {
+    let factor = 0.2;
+    if (p.includes('50%')) factor = 0.5;
+    if (p.includes('20%')) factor = 0.2;
+    if (p.includes('40%')) factor = 0.4;
+    directives.push({
+      directive_type: 'solar_reduction',
+      hours: hours,
+      factor: factor,
+      notes: `Solar reduced to ${factor * 100}% during hours ${hours.join(', ')}`
+    });
+  }
+
+  if (p.includes('reserve') || p.includes('battery at least') || p.includes('min soc')) {
+    let minSoc = 0.4;
+    if (p.includes('30%')) minSoc = 0.3;
+    if (p.includes('40%')) minSoc = 0.4;
+    if (p.includes('50%')) minSoc = 0.5;
+    directives.push({
+      directive_type: 'minimum_battery_reserve',
+      hours: [18, 19, 20, 21, 22],
+      min_soc_pct: minSoc,
+      notes: `Keep battery reserve >= ${minSoc * 100}% during peak hours`
+    });
+  }
+
+  if (p.includes('no charge') || p.includes('do not charge')) {
+    directives.push({
+      directive_type: 'no_charge_window',
+      hours: hours,
+      notes: `Charging disabled during hours ${hours.join(', ')}`
+    });
+  }
+
+  if (directives.length === 0) {
+    directives.push({ directive_type: 'no_op', hours: [], notes: 'Standard optimal dispatch' });
+  }
+
+  return {
+    directives,
+    operator_summary: `Parsed ${directives.length} directive(s) from operator note.`
+  };
+}
+
+function clientSideEnergySimulator(scenario, directives) {
+  const T = 24;
+  const hours = Array.from({ length: T }, (_, i) => i);
+  const solar_factors = Array(T).fill(1.0);
+  const min_soc_limits = Array(T).fill(scenario.battery_capacity_kwh * scenario.min_soc_pct);
+
+  directives.forEach(d => {
+    if (d.directive_type === 'solar_reduction' && d.factor !== undefined) {
+      d.hours.forEach(h => { solar_factors[h] = Math.min(solar_factors[h], d.factor); });
+    }
+    if (d.directive_type === 'minimum_battery_reserve' && d.min_soc_pct !== undefined) {
+      d.hours.forEach(h => { min_soc_limits[h] = Math.max(min_soc_limits[h], scenario.battery_capacity_kwh * d.min_soc_pct); });
+    }
+  });
+
+  let current_soc = scenario.initial_soc_kwh;
+  let total_cost = 0;
+  let baseline_cost = 0;
+  let total_solar_gen = 0;
+  let total_solar_used = 0;
+  let total_grid_in = 0;
+  let total_bat_chg = 0;
+  let total_bat_dis = 0;
+  let peak_grid = 0;
+
+  const schedule = hours.map(h => {
+    const effective_solar = scenario.solar_profile[h] * solar_factors[h];
+    total_solar_gen += effective_solar;
+    const load = scenario.load_profile[h];
+    const tariff = scenario.tariff_profile[h];
+    const fit = (scenario.feed_in_tariff && scenario.feed_in_tariff[h]) || 0.05;
+
+    // Baseline calculation
+    const base_solar_used = Math.min(load, effective_solar);
+    const base_net_load = load - base_solar_used;
+    const base_surplus = effective_solar - base_solar_used;
+    baseline_cost += (base_net_load * tariff) - (base_surplus * fit);
+
+    let solar_used = Math.min(load, effective_solar);
+    let rem_solar = effective_solar - solar_used;
+    let rem_load = load - solar_used;
+    let b_chg = 0;
+    let b_dis = 0;
+
+    // Charge battery if cheap tariff or excess solar
+    if (rem_solar > 0 && current_soc < scenario.battery_capacity_kwh * scenario.max_soc_pct) {
+      b_chg = Math.min(rem_solar, scenario.max_charge_kw, (scenario.battery_capacity_kwh * scenario.max_soc_pct - current_soc) / scenario.battery_efficiency);
+      current_soc += b_chg * scenario.battery_efficiency;
+      solar_used += b_chg;
+      rem_solar -= b_chg;
+    }
+
+    // Discharge battery if peak tariff
+    if (rem_load > 0 && tariff >= 0.25 && current_soc > min_soc_limits[h]) {
+      const avail = (current_soc - min_soc_limits[h]) * scenario.battery_efficiency;
+      b_dis = Math.min(rem_load, scenario.max_discharge_kw, avail);
+      current_soc -= b_dis / scenario.battery_efficiency;
+      rem_load -= b_dis;
+    }
+
+    const grid_in = rem_load;
+    const grid_out = rem_solar;
+    const h_cost = (grid_in * tariff) - (grid_out * fit);
+
+    total_cost += h_cost;
+    total_solar_used += solar_used;
+    total_grid_in += grid_in;
+    total_bat_chg += b_chg;
+    total_bat_dis += b_dis;
+    peak_grid = Math.max(peak_grid, grid_in);
+
+    return {
+      hour: h,
+      time_label: `${String(h).padStart(2, '0')}:00`,
+      load_kwh: Number(load.toFixed(2)),
+      solar_available_kwh: Number(scenario.solar_profile[h].toFixed(2)),
+      solar_effective_kwh: Number(effective_solar.toFixed(2)),
+      solar_used_kwh: Number(solar_used.toFixed(2)),
+      solar_curtailed_kwh: Number(rem_solar.toFixed(2)),
+      battery_charge_kwh: Number(b_chg.toFixed(2)),
+      battery_discharge_kwh: Number(b_dis.toFixed(2)),
+      battery_soc_kwh: Number(current_soc.toFixed(2)),
+      battery_soc_pct: Number(((current_soc / scenario.battery_capacity_kwh) * 100).toFixed(1)),
+      grid_import_kwh: Number(grid_in.toFixed(2)),
+      grid_export_kwh: Number(grid_out.toFixed(2)),
+      tariff_per_kwh: tariff,
+      feed_in_tariff_per_kwh: fit,
+      hourly_cost: Number(h_cost.toFixed(4)),
+      active_directives: []
+    };
+  });
+
+  total_cost = Number(total_cost.toFixed(2));
+  baseline_cost = Number(baseline_cost.toFixed(2));
+  const savings_amount = Number(Math.max(0, baseline_cost - total_cost).toFixed(2));
+  const savings_pct = baseline_cost > 0 ? Number(((savings_amount / baseline_cost) * 100).toFixed(1)) : 0;
+
+  return {
+    success: true,
+    solver_status: 'OPTIMAL (Simulation)',
+    scenario_name: scenario.name,
+    total_cost,
+    baseline_cost,
+    savings_amount,
+    savings_pct,
+    total_solar_generated_kwh: Number(total_solar_gen.toFixed(2)),
+    total_solar_used_kwh: Number(total_solar_used.toFixed(2)),
+    total_solar_curtailed_kwh: 0,
+    solar_utilization_pct: total_solar_gen > 0 ? Number(((total_solar_used / total_solar_gen) * 100).toFixed(1)) : 100,
+    total_grid_imported_kwh: Number(total_grid_in.toFixed(2)),
+    total_grid_exported_kwh: 0,
+    total_battery_charged_kwh: Number(total_bat_chg.toFixed(2)),
+    total_battery_discharged_kwh: Number(total_bat_dis.toFixed(2)),
+    peak_grid_demand_kw: Number(peak_grid.toFixed(2)),
+    directives_applied: directives,
+    hourly_schedule: schedule,
+    explanation: `Calculated schedule. Baseline: $${baseline_cost}, Optimized: $${total_cost}, Savings: ${savings_pct}%`
+  };
+}

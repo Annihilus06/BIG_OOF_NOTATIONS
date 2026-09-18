@@ -1,0 +1,23 @@
+﻿# Dependencies
+node_modules/
+backend/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+.env.local
+
+# Build artifacts
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# System & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.system_generated/
+*.log
