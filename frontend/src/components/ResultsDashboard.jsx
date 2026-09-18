@@ -4,13 +4,11 @@ import {
   XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine 
 } from 'recharts';
 import { 
-  TrendingDown, Sun, Zap, Layers, BatteryCharging, 
-  Cpu, CheckCircle2, AlertTriangle, ShieldCheck, 
-  ArrowLeft, Download, RefreshCw, Table, Activity, FileSpreadsheet
+  TrendingDown, Sun, Layers, BatteryCharging, 
+  CheckCircle2, AlertTriangle, ShieldCheck, 
+  ArrowLeft, Download, Table, Activity, FileSpreadsheet
 } from 'lucide-react';
-import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
-import { Button } from './ui/Button';
 import { COLORS } from '../lib/colors';
 
 export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) {
@@ -18,19 +16,19 @@ export default function ResultsDashboard({ result, onBackToConsole, onNewRun }) 
 
   if (!result || !result.hourly_schedule || result.hourly_schedule.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto py-16 text-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-[#212121] border border-[#333] flex items-center justify-center mx-auto text-slate-400">
-          <Cpu className="w-6 h-6" />
-        </div>
-        <h3 className="text-lg font-semibold text-white">No Optimization Results Yet</h3>
-        <p className="text-sm text-slate-400 max-w-md mx-auto">
-          Enter an operational instruction or attach a scenario JSON in the console to compute the 24-hour lowest-cost dispatch.
+      <div className="max-w-md mx-auto py-28 text-center space-y-3 select-none">
+        <h3 className="text-base font-semibold text-slate-300">Nothing to show</h3>
+        <p className="text-xs text-slate-500">
+          Attach a 24-hour grid scenario JSON or enter operator instructions in the prompt console to run optimization.
         </p>
         {onBackToConsole && (
-          <Button variant="primary" size="md" onClick={onBackToConsole} className="mt-2">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            <span>Go to Prompt Console</span>
-          </Button>
+          <button
+            onClick={onBackToConsole}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] text-sky-400 text-xs font-medium border border-[#333] transition-colors cursor-pointer mt-2"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Open Prompt Console</span>
+          </button>
         )}
       </div>
     );

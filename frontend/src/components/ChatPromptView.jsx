@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Plus, ArrowUp, Sparkles, FileJson, X, 
-  CheckCircle2, AlertCircle, Sun, Battery, ShieldAlert,
-  Building2, Flame, Car, Sliders, ChevronDown
+  CheckCircle2, AlertCircle, Sliders, ChevronDown
 } from 'lucide-react';
 import { DEFAULT_SCENARIOS } from '../lib/presets';
 
@@ -34,7 +33,6 @@ export default function ChatPromptView({
       try {
         const raw = JSON.parse(event.target?.result);
         
-        // Handle various JSON formats (single scenario, wrapped cases, or array)
         let parsedScenario = null;
         if (raw.load_profile && raw.solar_profile && raw.tariff_profile) {
           parsedScenario = raw;
@@ -99,51 +97,8 @@ export default function ChatPromptView({
     }
   };
 
-  const promptSuggestions = [
-    {
-      title: 'Commercial Office Benchmark',
-      description: 'Solve optimal 24h baseline without manual overrides',
-      prompt: '',
-      scenarioKey: 'default',
-      icon: Building2,
-      color: 'text-sky-400'
-    },
-    {
-      title: 'Cloud Cover Contingency',
-      description: 'Solar drops by 50% between 12 PM and 3 PM',
-      prompt: 'Cloud cover reducing solar output to 50% between 12 PM and 3 PM. Use battery and grid to maintain power balance.',
-      scenarioKey: 'default',
-      icon: Sun,
-      color: 'text-amber-400'
-    },
-    {
-      title: 'Peak Evening Reserve',
-      description: 'Maintain 40% battery reserve from 6 PM to 10 PM',
-      prompt: 'During the evening peak from 6 PM to 10 PM, keep battery reserve at least 40% for backup reliability.',
-      scenarioKey: 'summer_heatwave',
-      icon: Battery,
-      color: 'text-emerald-400'
-    },
-    {
-      title: 'No Grid Charging in Peak',
-      description: 'Disable charging from grid during expensive tariff',
-      prompt: 'Do not charge the battery from grid between 5 PM and 9 PM during peak tariff hours.',
-      scenarioKey: 'high_solar',
-      icon: ShieldAlert,
-      color: 'text-rose-400'
-    }
-  ];
-
-  const handleSelectSuggestion = (sugg) => {
-    if (sugg.scenarioKey && DEFAULT_SCENARIOS[sugg.scenarioKey]) {
-      setScenario(DEFAULT_SCENARIOS[sugg.scenarioKey]);
-      setAttachedFile(null);
-    }
-    setOperatorPrompt(sugg.prompt);
-  };
-
   return (
-    <div className="flex-1 flex flex-col justify-between items-center max-w-4xl w-full mx-auto px-4 py-8 sm:py-12 min-h-[calc(100vh-140px)] select-none">
+    <div className="flex-1 flex flex-col justify-center items-center max-w-3xl w-full mx-auto px-4 py-8 select-none">
       
       {/* Hidden File Input for JSON attachment */}
       <input
@@ -154,23 +109,18 @@ export default function ChatPromptView({
         className="hidden"
       />
 
-      {/* Top Greeting */}
-      <div className="w-full text-center space-y-3 pt-6 sm:pt-10">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#1e1e1e] border border-[#2f2f2f] text-xs font-mono text-slate-300 shadow-xs mb-2">
-          <span className={`w-2 h-2 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
-          <span>{backendStatus === 'healthy' ? 'Google OR-Tools + Gemini Flash Engine Active' : 'Simulation Mode Active'}</span>
-        </div>
-
+      {/* Top Clean Greeting (ChatGPT style) */}
+      <div className="w-full text-center space-y-3 mb-8">
         <h1 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
           What can I optimize today?
         </h1>
-        <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
+        <p className="text-slate-400 text-sm max-w-md mx-auto">
           Attach a 24-hour grid scenario JSON, enter natural language operator notes, and compute lowest-cost mathematical dispatch.
         </p>
       </div>
 
       {/* Main Central Input Container (ChatGPT Style) */}
-      <div className="w-full my-auto space-y-4 pt-4">
+      <div className="w-full space-y-3">
         
         {/* Error Notification */}
         {uploadError && (
@@ -186,7 +136,7 @@ export default function ChatPromptView({
         )}
 
         {/* The Sleek ChatGPT Prompt Pill */}
-        <div className="w-full bg-[#212121] rounded-2xl sm:rounded-3xl border border-[#2f2f2f] hover:border-[#404040] focus-within:border-[#4f4f4f] transition-all shadow-xl p-3 sm:p-4 space-y-3">
+        <div className="w-full bg-[#212121] rounded-2xl sm:rounded-3xl border border-[#2f2f2f] hover:border-[#3f3f3f] focus-within:border-[#555] transition-all shadow-xl p-3 sm:p-4 space-y-3">
           
           {/* Top Row: Attached JSON File or Scenario Tag */}
           <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
@@ -260,7 +210,7 @@ export default function ChatPromptView({
             onChange={(e) => setOperatorPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask anything or enter operator instructions (e.g. 'Cloud cover reducing solar to 30% from 1 PM to 4 PM, keep battery at 40% in evening peak')..."
-            className="w-full bg-transparent text-white placeholder-slate-400 text-sm sm:text-base outline-none resize-none font-sans leading-relaxed"
+            className="w-full bg-transparent text-white placeholder-slate-500 text-sm sm:text-base outline-none resize-none font-sans leading-relaxed"
           />
 
           {/* Bottom Bar: + Button on Left, Action Buttons on Right */}
@@ -277,10 +227,6 @@ export default function ChatPromptView({
                 <Plus className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
                 <span className="hidden sm:inline">Add JSON Scenario</span>
               </button>
-
-              <span className="text-[11px] text-slate-400 font-mono hidden md:inline">
-                Supports .json files (24h profiles)
-              </span>
             </div>
 
             {/* Right: Parse Directives & Circular Send (?) */}
@@ -309,7 +255,7 @@ export default function ChatPromptView({
                     ? 'bg-slate-700 text-slate-400 cursor-wait'
                     : 'bg-white hover:bg-slate-200 text-black active:scale-95'
                 }`}
-                title="Run OR-Tools Optimization & Produce Output in Next Page"
+                title="Run Optimization & View Output in Next Page"
               >
                 {isLoading ? (
                   <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
@@ -324,36 +270,6 @@ export default function ChatPromptView({
 
         </div>
 
-        {/* Suggestion Prompt Cards Below the Input */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-          {promptSuggestions.map((sugg, idx) => {
-            const Icon = sugg.icon;
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSelectSuggestion(sugg)}
-                className="p-3 rounded-2xl bg-[#1c1c1c] hover:bg-[#262626] border border-[#2a2a2a] hover:border-[#3a3a3a] text-left transition-all cursor-pointer flex items-start space-x-3 group"
-              >
-                <div className={`p-2 rounded-xl bg-[#252525] ${sugg.color} shrink-0 group-hover:scale-105 transition-transform`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <div className="text-xs font-semibold text-slate-200 group-hover:text-white flex items-center space-x-1">
-                    <span>{sugg.title}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 line-clamp-1">{sugg.description}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-      </div>
-
-      {/* Footer Info */}
-      <div className="text-center text-xs text-slate-400 font-mono py-2">
-        <span>GridWise AI • Google OR-Tools (LP/GLOP) Optimization Engine • Gemini 1.5 Flash</span>
       </div>
 
     </div>

@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Menu, Sparkles, MessageSquare, Activity, Table, History, 
-  Layers, Plus, ArrowLeft, RefreshCw 
+  Menu, Plus, ArrowLeft
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ChatPromptView from './components/ChatPromptView';
 import ResultsDashboard from './components/ResultsDashboard';
 import ScheduleTable from './components/ScheduleTable';
 import HistoryView from './components/HistoryView';
-import ArchitectureModal from './components/ArchitectureModal';
 import { DEFAULT_SCENARIOS } from './lib/presets';
 import { 
   checkBackendHealth, 
@@ -24,12 +22,11 @@ export default function App() {
   const [scenario, setScenario] = useState(DEFAULT_SCENARIOS.default);
   const [directives, setDirectives] = useState([]);
   const [operatorPrompt, setOperatorPrompt] = useState('');
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(null); // Starts empty (no demo data)
   const [historyList, setHistoryList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isParsingDirectives, setIsParsingDirectives] = useState(false);
   const [backendStatus, setBackendStatus] = useState('checking');
-  const [isArchModalOpen, setIsArchModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (msg) => {
@@ -37,7 +34,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Initial load: check health, fetch history, solve initial baseline
+  // Initial load: check health and fetch real history only (NO fake demo data generation)
   useEffect(() => {
     async function init() {
       const health = await checkBackendHealth();
@@ -45,13 +42,6 @@ export default function App() {
       
       const history = await fetchHistory();
       setHistoryList(history);
-
-      try {
-        const initialRes = await runOptimization(DEFAULT_SCENARIOS.default, [], 'Initial baseline');
-        setResult(initialRes);
-      } catch (e) {
-        console.error('Initial baseline solve error:', e);
-      }
     }
     init();
   }, []);
@@ -111,7 +101,14 @@ export default function App() {
     setOperatorPrompt('');
     setDirectives([]);
     setScenario(DEFAULT_SCENARIOS.default);
+    setResult(null);
     setActiveTab('optimizer');
+  };
+
+  const handleClearHistory = () => {
+    localStorage.removeItem('gridwise_history');
+    setHistoryList([]);
+    showToast('History cleared.');
   };
 
   const handleSelectHistoryItem = (item) => {
@@ -149,17 +146,17 @@ export default function App() {
         presetScenarios={DEFAULT_SCENARIOS}
         historyList={historyList}
         onSelectHistoryItem={handleSelectHistoryItem}
+        onClearHistory={handleClearHistory}
         backendStatus={backendStatus}
-        onOpenArchModal={() => setIsArchModalOpen(true)}
       />
 
       {/* Main Content Area */}
       <div className={`flex-1 flex flex-col min-h-screen transition-all duration-200 ${isSidebarOpen ? 'lg:pl-64' : 'pl-0'}`}>
         
-        {/* Top Header Bar */}
+        {/* Top Minimalist Navigation Bar */}
         <header className="sticky top-0 z-30 h-14 bg-[#111111]/90 backdrop-blur-md border-b border-[#222222] px-4 flex items-center justify-between">
           
-          {/* Left: Sidebar Toggle & New Chat icon */}
+          {/* Left: Sidebar Toggle & New Optimization icon */}
           <div className="flex items-center space-x-2">
             {!isSidebarOpen && (
               <button
@@ -174,65 +171,49 @@ export default function App() {
             <button
               onClick={handleNewOptimization}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#212121] hover:bg-[#2c2c2c] text-slate-200 text-xs font-medium border border-[#2f2f2f] transition-all cursor-pointer"
-              title="New Optimization Prompt"
+              title="New Optimization"
             >
               <Plus className="w-3.5 h-3.5 text-sky-400" />
-              <span className="hidden sm:inline">New Optimization</span>
+              <span>New Optimization</span>
             </button>
           </div>
 
-          {/* Center: Clean Page View Switcher */}
+          {/* Center: View Switcher */}
           <div className="flex items-center p-1 rounded-full bg-[#1c1c1c] border border-[#2e2e2e] text-xs">
             <button
               onClick={() => setActiveTab('optimizer')}
-              className={`flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                 activeTab === 'optimizer' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
-              <span>Prompt Console</span>
+              Prompt Console
             </button>
 
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                 activeTab === 'dashboard' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Activity className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Telemetry & Graphs</span>
+              Telemetry & Graphs
             </button>
 
             <button
               onClick={() => setActiveTab('schedule')}
-              className={`hidden md:flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
+              className={`hidden sm:inline-block px-3 py-1 rounded-full transition-all cursor-pointer ${
                 activeTab === 'schedule' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Table className="w-3.5 h-3.5 text-amber-400" />
-              <span>24h Schedule</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`hidden lg:flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
-                activeTab === 'history' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <History className="w-3.5 h-3.5 text-slate-400" />
-              <span>Audit Log</span>
+              24h Schedule
             </button>
           </div>
 
-          {/* Right: Architecture & Status */}
+          {/* Right Status Indicator */}
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setIsArchModalOpen(true)}
-              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-[#1c1c1c] hover:bg-[#282828] text-slate-300 text-xs border border-[#2f2f2f] transition-colors cursor-pointer"
-            >
-              <Layers className="w-3.5 h-3.5 text-sky-400" />
-              <span className="hidden sm:inline">Architecture</span>
-            </button>
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#1c1c1c] border border-[#2e2e2e] text-[11px] font-mono">
+              <span className={`w-2 h-2 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <span className="text-slate-300 hidden sm:inline">{backendStatus === 'healthy' ? 'OR-Tools Engine Live' : 'Simulation'}</span>
+            </div>
           </div>
 
         </header>
@@ -304,12 +285,6 @@ export default function App() {
         </main>
 
       </div>
-
-      {/* Architecture System Modal */}
-      <ArchitectureModal
-        isOpen={isArchModalOpen}
-        onClose={() => setIsArchModalOpen(false)}
-      />
 
     </div>
   );
