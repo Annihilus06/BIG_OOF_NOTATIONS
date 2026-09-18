@@ -1,0 +1,131 @@
+{
+  "name": "GridWise AI - Microgrid Dispatch Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gridwise-webhook",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "gridwise-energy-inflow"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Transform incoming grid telemetry or operator alert into GridWise canonical payload\nconst body = items[0].json.body || items[0].json;\n\nreturn [{\n  json: {\n    scenario_id: body.scenario_id || 'telemetry_live_' + Date.now(),\n    operator_notes: body.operator_notes || [\n      'Cloud cover expected from 12:00 to 15:00 reducing solar by 80%',\n      'Maintain minimum 40% battery reserve from 18:00 to 22:00 for evening peak'\n    ],\n    battery: body.battery || {\n      capacity_kwh: 40.0,\n      initial_energy_kwh: 20.0,\n      min_reserve_percent: 20.0,\n      max_charge_kw: 10.0,\n      max_discharge_kw: 10.0,\n      charge_efficiency: 0.95,\n      discharge_efficiency: 0.95\n    },\n    hours: body.hours || []\n  }\n}];"
+      },
+      "name": "Format Payload",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://backend:8000/optimize-energy",
+        "options": {},
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ JSON.stringify($json) }}"
+      },
+      "name": "FastAPI OR-Tools Solver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.total_cost_bdt }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Validate Schedule",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "DISPATCH_OPTIMIZED"
+            },
+            {
+              "name": "total_cost_bdt",
+              "value": "={{ $json.total_cost_bdt }}"
+            },
+            {
+              "name": "total_grid_kwh",
+              "value": "={{ $json.total_grid_kwh }}"
+            },
+            {
+              "name": "plan_summary",
+              "value": "={{ $json.plan_summary }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Emit Notification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1120, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Payload": {
+      "main": [
+        [
+          {
+            "node": "FastAPI OR-Tools Solver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FastAPI OR-Tools Solver": {
+      "main": [
+        [
+          {
+            "node": "Validate Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Schedule": {
+      "main": [
+        [
+          {
+            "node": "Emit Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

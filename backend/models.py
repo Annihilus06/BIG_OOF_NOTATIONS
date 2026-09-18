@@ -1,6 +1,7 @@
 """
 Pydantic Data Models for GridWise AI Platform
-Enforces strict mathematical typing, BDT currency, and directive validation.
+Clean Architecture Domain & Presentation Contracts.
+Enforces strict mathematical typing, BDT currency, and canonical competition schemas.
 """
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, field_validator
@@ -15,6 +16,82 @@ DirectiveType = Literal[
     "no_op"
 ]
 
+
+# ====================================================================
+# Canonical Competition Schemas (Official Hackathon Spec)
+# =====================================================================
+
+class BatterySpec(BaseModel):
+    capacity_kwh: float = Field(default=40.0, ge=1.0, description="Total energy capacity in kWh")
+    initial_energy_kwh: float = Field(default=20.0, ge=0.0, description="Initial battery energy in kWh")
+    min_reserve_percent: float = Field(default=20.0, ge=0.0, le=100.0, description="Base reserve percentage (0-100)")
+    max_charge_kw: float = Field(default=10.0, ge=0.1, description="Max charge power in kW")
+    max_discharge_kw: float = Field(default=10.0, ge=0.1, description="Max discharge power in kW")
+    charge_efficiency: float = Field(default=0.95, gt=0.0, le=1.0, description="Charging efficiency (0-1)")
+    discharge_efficiency: float = Field(default=0.95, gt=0.0, le=1.0, description="Discharging efficiency (0-1)")
+
+
+class HourlyInput(BaseModel):
+    hour: int = Field(..., ge=0, le=23, description="Hour of the day 0-23")
+    demand_kwh: float = Field(..., ge=0.0, description="Building load demand in kWh")
+    solar_kwh: float = Field(..., ge=0.0, description="Available solar generation in kWh")
+    tariff_bdt_per_kwh: float = Field(..., ge=0.0, description="Grid purchase price in BDT/kWh")
+    feed_in_tariff_bdt_per_kwh: Optional[float] = Field(default=0.0, ge=0.0, description="Grid export price in BDT/kWh")
+
+
+class CompetitionScenarioRequest(BaseModel):
+    scenario_id: str = Field(default="scenario_default", description="Unique scenario identifier")
+    operator_notes: List[str] = Field(default_factory=list, description="Natural language notes from operator")
+    battery: BatterySpec = Field(default_factory=BatterySpec, description="Battery hardware specifications")
+    hours: List[HourlyInput] = Field(..., description="24 hourly data entries")
+
+    @field_validator("hours")
+    def validate_24_hours(cls, v):
+        if len(v) != 24:
+            raise ValueError(f"Scenario must contain exactly 24 hourly values, got {len(v)}")
+        return v
+
+
+class DirectiveInterpretation(BaseModel):
+    raw_note: str = Field(..., description="Original operator note string")
+    applies: bool = Field(default=True, description="True if operational constraint applies")
+    directive_type: DirectiveType = Field(..., description="Identified constraint type")
+    hours: List[int] = Field(default_factory=list, description="Start-inclusive, end-exclusive 0-23 hour indices")
+    factor: Optional[float] = Field(None, description="Solar factor or scaling fraction (0.0 - 1.0)")
+    min_soc_pct: Optional[float] = Field(None, description="Minimum battery reserve fraction (0.0 - 1.0)")
+    max_grid_kw: Optional[float] = Field(None, description="Maximum grid import kW")
+    notes: Optional[str] = Field(None, description="Structured explanation of how directive was applied")
+
+
+class HourlyPlanItem(BaseModel):
+    hour: int
+    solar_used_kwh: float
+    battery_charge_kwh: float
+    battery_discharge_kwh: float
+    battery_energy_after_kwh: float
+    battery_soc_percent: float
+    grid_kwh: float
+    tariff_bdt_per_kwh: float
+    hourly_cost_bdt: float
+    active_directives: List[str] = Field(default_factory=list)
+
+
+class CompetitionScenarioResponse(BaseModel):
+    scenario_id: str
+    directive_interpretation: List[DirectiveInterpretation]
+    hourly_plan: List[HourlyPlanItem]
+    total_grid_kwh: float
+    total_cost_bdt: float
+    peak_grid_kwh: float
+    plan_summary: str
+    solver_status: str = "OPTIMAL"
+    battery_end_of_day_neutral: bool = True
+    validation_passed: bool = True
+
+
+# ====================================================================
+# Internal Platform & UIpData Models
+# ====================================================================
 
 class Directive(BaseModel):
     directive_type: DirectiveType = Field(..., description="Type of energy operator directive")
@@ -62,13 +139,13 @@ class ScenarioData(BaseModel):
     battery_efficiency: float = Field(default=0.95, gt=0.0, le=1.0, description="Battery one-way charging/discharging efficiency")
     min_soc_pct: float = Field(default=0.15, ge=0.0, le=0.5, description="Default minimum reserve fraction (0.0-1.0)")
     max_soc_pct: float = Field(default=0.95, ge=0.5, le=1.0, description="Maximum SOC ceiling fraction (0.0-1.0)")
-    degradation_cost_bdt_per_kwh: float = Field(default=0.25, ge=0.0, description="Battery wear cost (৳/kWh cycled)")
+    degradation_cost_bdt_per_kwh: float = Field(default=0.25, ge=0.0, description="Battery wear cost in BDT/kWh cycled")
     
     # 24-hour profiles
     load_profile: List[float] = Field(..., description="24-hour demand profile in kWh")
     solar_profile: List[float] = Field(..., description="24-hour solar generation in kWh")
-    tariff_profile: List[float] = Field(..., description="24-hour grid purchase tariff (৳/kWh)")
-    feed_in_tariff: Optional[List[float]] = Field(default=None, description="24-hour grid export price (৳/kWh)")
+    tariff_profile: List[float] = Field(..., description="24-hour grid purchase tariff (BDT/kWh)")
+    feed_in_tariff: Optional[List[float]] = Field(default=None, description="24-hour grid export price (BDT/kWh)")
 
     @field_validator("load_profile", "solar_profile", "tariff_profile")
     def validate_24_hours(cls, v, info):
@@ -116,9 +193,9 @@ class HourlyScheduleItem(BaseModel):
 
 class SolveResult(BaseModel):
     success: bool
-    solver_status: str = Field(..., description="OPTIMAL, FEASIBLE, or INVALID")
+    solver_status: str = Field(..., description="OPTIMAL, FEASBILE, or INVALID")
     scenario_name: str
-    currency: str = Field(default="BDT (৳)", description="Currency unit")
+    currency: str = Field(default="BDT", description="Currency unit")
     
     # Financial metrics in BDT
     total_cost_bdt: float
