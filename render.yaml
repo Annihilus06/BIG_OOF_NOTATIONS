@@ -1,0 +1,13 @@
+﻿services:
+  - type: web
+    name: gridwise-api
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        value: https://ikmgwwjygglszafjyfsx.supabase.co
+      - key: SUPABASE_KEY
+        value: sb_publishable_6--Ujj7X_HCzFzwpF8ecvg_T6mkZz-A
+      - key: GEMINI_API_KEY
+        sync: false

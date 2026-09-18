@@ -1,0 +1,21 @@
+﻿version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=https://ikmgwwjygglszafjyfsx.supabase.co
+      - SUPABASE_KEY=sb_publishable_6--Ujj7X_HCzFzwpF8ecvg_T6mkZz-A
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
