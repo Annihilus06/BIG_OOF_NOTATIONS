@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Menu, Plus, ArrowLeft
+  Menu, Plus
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ChatPromptView from './components/ChatPromptView';
@@ -13,7 +13,8 @@ import {
   parseNaturalLanguagePrompt, 
   runOptimization, 
   fetchHistory, 
-  saveLocalHistory 
+  saveLocalHistory,
+  isValidOperatorPrompt
 } from './lib/api';
 
 export default function App() {
@@ -31,10 +32,10 @@ export default function App() {
 
   const showToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Initial load: check health and fetch real history only (NO fake demo data generation)
+  // Initial load: check health and fetch history
   useEffect(() => {
     async function init() {
       const health = await checkBackendHealth();
@@ -49,29 +50,53 @@ export default function App() {
   // Parse natural language directives via Gemini
   const handleParseDirectives = async (promptText) => {
     if (!promptText || !promptText.trim()) return;
+    
+    if (!isValidOperatorPrompt(promptText)) {
+      showToast(`Could not understand: "${promptText}". Please enter a valid operational constraint.`);
+      return;
+    }
+
     setIsParsingDirectives(true);
     try {
       const res = await parseNaturalLanguagePrompt(promptText);
-      if (res && res.directives) {
+      if (res && res.success === false) {
+        showToast(res.error || `Unrecognized instruction: "${promptText}".`);
+        return;
+      }
+
+      if (res && res.directives && res.directives.length > 0) {
         setDirectives(res.directives);
-        showToast(`Gemini extracted ${res.directives.length} operational constraint(s).`);
+        showToast(`Extracted ${res.directives.length} operational constraint(s).`);
+      } else {
+        showToast('No active dispatch constraints detected.');
       }
     } catch (err) {
       console.error('Directive parse error:', err);
-      showToast('Directive parsing failed, using fallback.');
+      showToast('Directive parsing failed.');
     } finally {
       setIsParsingDirectives(false);
     }
   };
 
-  // Run OR-Tools Optimization and transition to the next page!
+  // Run OR-Tools Optimization
   const handleRunOptimization = async () => {
+    // If prompt has text, validate it first!
+    if (operatorPrompt.trim().length > 0 && !isValidOperatorPrompt(operatorPrompt)) {
+      showToast(`Could not understand directive: "${operatorPrompt}". Please enter a valid operational constraint or clear the prompt.`);
+      return;
+    }
+
     setIsLoading(true);
     try {
       let currentDirectives = directives;
       
       if (operatorPrompt.trim() && directives.length === 0) {
         const parsedRes = await parseNaturalLanguagePrompt(operatorPrompt);
+        if (parsedRes && parsedRes.success === false) {
+          showToast(parsedRes.error || `Unrecognized instruction: "${operatorPrompt}".`);
+          setIsLoading(false);
+          return;
+        }
         if (parsedRes && parsedRes.directives) {
           currentDirectives = parsedRes.directives;
           setDirectives(parsedRes.directives);
@@ -87,7 +112,7 @@ export default function App() {
 
       showToast(`Optimal dispatch found! Saved ?${(res.savings_amount_bdt || res.savings_amount || 0).toFixed(2)} (+${res.savings_pct.toFixed(1)}%).`);
       
-      // PRODUCE OUTPUT AND GRAPH IN NEXT PAGE:
+      // Transition to next page only on successful run
       setActiveTab('dashboard');
     } catch (err) {
       console.error('Optimization solve error:', err);
@@ -128,8 +153,8 @@ export default function App() {
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl border border-[#333] bg-[#1a1a1a] text-xs font-mono text-slate-200 shadow-2xl flex items-center space-x-2 animate-fade-in">
-          <span className="w-2 h-2 rounded-full bg-sky-400" />
+        <div className="fixed bottom-6 right-6 z-50 max-w-md px-4 py-3 rounded-xl border border-[#333] bg-[#1a1a1a] text-xs font-mono text-slate-200 shadow-2xl flex items-center space-x-2.5 animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -212,7 +237,7 @@ export default function App() {
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#1c1c1c] border border-[#2e2e2e] text-[11px] font-mono">
               <span className={`w-2 h-2 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span className="text-slate-300 hidden sm:inline">{backendStatus === 'healthy' ? 'OR-Tools Engine Live' : 'Simulation'}</span>
+              <span className="text-slate-300 hidden sm:inline">{backendStatus === 'healthy' ? 'OR-Tools Live' : 'Simulation'}</span>
             </div>
           </div>
 

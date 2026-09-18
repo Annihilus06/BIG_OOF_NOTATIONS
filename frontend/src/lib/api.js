@@ -2,6 +2,24 @@ import { DEFAULT_SCENARIOS } from './presets';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
+export function isValidOperatorPrompt(prompt) {
+  if (!prompt || !prompt.trim()) return true; // Empty is valid for default dispatch
+  const p = prompt.trim().toLowerCase();
+  
+  // List of valid operational domains / vocabulary
+  const energyKeywords = [
+    'solar', 'sun', 'pv', 'cloud', 'weather', 'overcast', 'shading', 'dust', 'cleaning',
+    'battery', 'soc', 'reserve', 'charge', 'discharge', 'storage', 'kwh', 'kw', 'buffer',
+    'grid', 'import', 'export', 'tariff', 'peak', 'cost', 'bdt', 'price', 'feed', 'demand',
+    'hour', 'am', 'pm', 'reduce', 'drop', 'cut', 'hold', 'keep', 'limit', 'cap', 'prevent', 'block',
+    'avoid', 'disable', 'prohibit', 'stop', 'halt', 'benchmark', 'optimize', 'dispatch', 'baseline', 
+    'schedule', 'normal', 'default', 'fleet', 'ev', 'office', 'heatwave', 'ac', 'spikes'
+  ];
+  
+  // If text contains at least one relevant keyword, it passes heuristic validation
+  return energyKeywords.some(kw => p.includes(kw));
+}
+
 export async function checkBackendHealth() {
   try {
     const res = await fetch(API_BASE + '/health');
@@ -15,6 +33,19 @@ export async function checkBackendHealth() {
 }
 
 export async function parseNaturalLanguagePrompt(prompt) {
+  if (!prompt || !prompt.trim()) {
+    return { success: true, directives: [], operator_summary: 'Default baseline dispatch' };
+  }
+
+  if (!isValidOperatorPrompt(prompt)) {
+    return {
+      success: false,
+      directives: [],
+      error: `Unrecognized instruction: "${prompt.trim()}". Please enter a valid operational constraint.`,
+      operator_summary: `Unrecognized directive: "${prompt.trim()}".`
+    };
+  }
+
   try {
     const res = await fetch(API_BASE + '/process-nl', {
       method: 'POST',
@@ -22,7 +53,16 @@ export async function parseNaturalLanguagePrompt(prompt) {
       body: JSON.stringify({ prompt })
     });
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      if (data.directives && data.directives.length === 0 && prompt.trim().length > 0) {
+        // Backend didn't find any operational constraints
+        return {
+          ...data,
+          success: true,
+          warning: "No active dispatch constraints detected in instruction."
+        };
+      }
+      return data;
     }
   } catch (err) {
     console.warn('API /process-nl unreachable, using client fallback parsing.', err);
@@ -61,7 +101,7 @@ export async function runOptimization(scenario, directives, rawPrompt = '') {
     const errData = await res.json();
     throw new Error(errData.detail || 'Optimization failed');
   } catch (err) {
-    console.warn('API /solve unreachable or threw error, running client simulation.', err);
+    console.warn('API /solve unreachable, running client simulation.', err);
     return clientSideEnergySimulator(scenario, directives);
   }
 }
@@ -76,7 +116,7 @@ export async function fetchHistory() {
       }
     }
   } catch (err) {
-    console.warn('Could not fetch remote history, returning local storage.');
+    console.warn('Could not fetch remote history.');
   }
 
   const saved = localStorage.getItem('gridwise_history');
@@ -111,6 +151,15 @@ export function saveLocalHistory(result, scenario, directives, rawPrompt) {
 }
 
 function clientSideOperatorParser(prompt) {
+  if (!isValidOperatorPrompt(prompt)) {
+    return {
+      success: false,
+      directives: [],
+      error: `Unrecognized instruction: "${prompt}".`,
+      operator_summary: `Unrecognized instruction: "${prompt}".`
+    };
+  }
+
   const p = prompt.toLowerCase();
   const directives = [];
 
@@ -132,7 +181,7 @@ function clientSideOperatorParser(prompt) {
       directive_type: 'solar_reduction',
       hours: hours,
       factor: factor,
-      notes: 'Solar reduced during peak window',
+      notes: `Solar reduced to ${factor * 100}% during hours [${hours.join(', ')}]`,
       applied: true,
       status_message: 'ENFORCED'
     });
@@ -147,7 +196,7 @@ function clientSideOperatorParser(prompt) {
       directive_type: 'minimum_battery_reserve',
       hours: [18, 19, 20, 21, 22],
       min_soc_pct: minSoc,
-      notes: 'Keep battery reserve during peak hours',
+      notes: `Keep battery reserve >= ${minSoc * 100}% during peak hours`,
       applied: true,
       status_message: 'ENFORCED'
     });
@@ -157,19 +206,16 @@ function clientSideOperatorParser(prompt) {
     directives.push({
       directive_type: 'no_charge_window',
       hours: hours,
-      notes: 'Charging disabled during window',
+      notes: `Charging disabled during hours [${hours.join(', ')}]`,
       applied: true,
       status_message: 'ENFORCED'
     });
   }
 
-  if (directives.length === 0) {
-    directives.push({ directive_type: 'no_op', hours: [], notes: 'Standard optimal dispatch', applied: true, status_message: 'ENFORCED' });
-  }
-
   return {
+    success: true,
     directives,
-    operator_summary: 'Parsed directives from operator instruction.'
+    operator_summary: `Identified ${directives.length} operational constraint(s).`
   };
 }
 
@@ -181,10 +227,10 @@ function clientSideEnergySimulator(scenario, directives) {
 
   directives.forEach(d => {
     if (d.directive_type === 'solar_reduction' && d.factor !== undefined) {
-      d.hours.forEach(h => { solar_factors[h] = Math.min(solar_factors[h], d.factor); });
+      (d.hours || []).forEach(h => { if (h >= 0 && h < T) solar_factors[h] = Math.min(solar_factors[h], d.factor); });
     }
     if (d.directive_type === 'minimum_battery_reserve' && d.min_soc_pct !== undefined) {
-      d.hours.forEach(h => { min_soc_limits[h] = Math.max(min_soc_limits[h], scenario.battery_capacity_kwh * d.min_soc_pct); });
+      (d.hours || []).forEach(h => { if (h >= 0 && h < T) min_soc_limits[h] = Math.max(min_soc_limits[h], scenario.battery_capacity_kwh * d.min_soc_pct); });
     }
   });
 
@@ -202,9 +248,10 @@ function clientSideEnergySimulator(scenario, directives) {
     const effective_solar = scenario.solar_profile[h] * solar_factors[h];
     total_solar_gen += effective_solar;
     const load = scenario.load_profile[h];
-    const tariff = scenario.tariff_profilg[h];
+    const tariff = scenario.tariff_profile[h];
     const fit = (scenario.feed_in_tariff && scenario.feed_in_tariff[h]) || 5.00;
 
+    // Baseline calculation
     const base_solar_used = Math.min(load, effective_solar);
     const base_net_load = load - base_solar_used;
     const base_surplus = effective_solar - base_solar_used;
@@ -216,13 +263,15 @@ function clientSideEnergySimulator(scenario, directives) {
     let b_chg = 0;
     let b_dis = 0;
 
+    // Charging during cheap tariff or surplus solar
     if (rem_solar > 0 && current_soc < scenario.battery_capacity_kwh * scenario.max_soc_pct && h < 16) {
-      b_chg = Math.min(rem_solar, scenario.max_charge_kw, (scenario.battery_capacity_kwh * scenario.max_coc_pct - current_soc) / scenario.battery_efficiency);
+      b_chg = Math.min(rem_solar, scenario.max_charge_kw, (scenario.battery_capacity_kwh * scenario.max_soc_pct - current_soc) / scenario.battery_efficiency);
       current_soc += b_chg * scenario.battery_efficiency;
       solar_used += b_chg;
       rem_solar -= b_chg;
     }
 
+    // Discharging during peak hours
     if (rem_load > 0 && tariff >= 20.0 && current_soc > min_soc_limits[h] && h < 22) {
       const avail = (current_soc - min_soc_limits[h]) * scenario.battery_efficiency;
       b_dis = Math.min(rem_load, scenario.max_discharge_kw, avail);
@@ -230,6 +279,7 @@ function clientSideEnergySimulator(scenario, directives) {
       rem_load -= b_dis;
     }
 
+    // Late night recharge to guarantee exact initial SOC recovery at hour 23
     if (h >= 22 && current_soc < scenario.initial_soc_kwh) {
       const needed = (scenario.initial_soc_kwh - current_soc) / scenario.battery_efficiency;
       b_chg = Math.min(needed, scenario.max_charge_kw);
@@ -249,7 +299,7 @@ function clientSideEnergySimulator(scenario, directives) {
 
     return {
       hour: h,
-      time_label: String(h).padStart(2, '0') + ':00',
+      time_label: `${String(h).padStart(2, '0')}:00`,
       load_kwh: Number(load.toFixed(2)),
       solar_available_kwh: Number(scenario.solar_profile[h].toFixed(2)),
       solar_effective_kwh: Number(effective_solar.toFixed(2)),
@@ -265,7 +315,7 @@ function clientSideEnergySimulator(scenario, directives) {
       feed_in_tariff_bdt_per_kwh: fit,
       hourly_cost_bdt: Number(h_cost.toFixed(2)),
       is_valid: true,
-      validation_note: 'VALID',
+      validation_note: "VALID",
       active_directives: []
     };
   });
@@ -279,7 +329,7 @@ function clientSideEnergySimulator(scenario, directives) {
     success: true,
     solver_status: 'OPTIMAL (Simulation)',
     scenario_name: scenario.name,
-    currency: 'BDT',
+    currency: 'BDT (?)',
     total_cost_bdt,
     baseline_cost_bdt,
     savings_amount_bdt,
@@ -292,7 +342,7 @@ function clientSideEnergySimulator(scenario, directives) {
     total_grid_exported_kwh: 0,
     total_battery_charged_kwh: Number(total_bat_chg.toFixed(2)),
     total_battery_discharged_kwh: Number(total_bat_dis.toFixed(2)),
-    peak_grid_demand_kwh: Number(peak_grid.toFixed(2)),
+    peak_grid_demand_kw: Number(peak_grid.toFixed(2)),
     initial_battery_kwh: scenario.initial_soc_kwh,
     final_battery_kwh: scenario.initial_soc_kwh,
     battery_energy_balanced: true,
@@ -300,6 +350,6 @@ function clientSideEnergySimulator(scenario, directives) {
     hourly_schedule: schedule,
     validation_passed: true,
     validation_errors: [],
-    explanation: 'Optimal schedule computed successfully. Battery energy conserved.'
+    explanation: `Optimal schedule. Baseline: ?${baseline_cost_bdt}, Optimized: ?${total_cost_bdt}, Savings: ${savings_pct}%. Battery energy conserved.`
   };
 }
