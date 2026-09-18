@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import Navbar from './components/Navbar';
-import OptimizationConsole from './components/OptimizationConsole';
+import { 
+  Menu, Sparkles, MessageSquare, Activity, Table, History, 
+  Layers, Plus, ArrowLeft, RefreshCw 
+} from 'lucide-react';
+import Sidebar from './components/Sidebar';
+import ChatPromptView from './components/ChatPromptView';
 import ResultsDashboard from './components/ResultsDashboard';
 import ScheduleTable from './components/ScheduleTable';
 import HistoryView from './components/HistoryView';
@@ -15,7 +19,8 @@ import {
 } from './lib/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('optimizer');
+  const [activeTab, setActiveTab] = useState('optimizer'); // 'optimizer' | 'dashboard' | 'schedule' | 'history'
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [scenario, setScenario] = useState(DEFAULT_SCENARIOS.default);
   const [directives, setDirectives] = useState([]);
   const [operatorPrompt, setOperatorPrompt] = useState('');
@@ -32,7 +37,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Initial load
+  // Initial load: check health, fetch history, solve initial baseline
   useEffect(() => {
     async function init() {
       const health = await checkBackendHealth();
@@ -45,13 +50,13 @@ export default function App() {
         const initialRes = await runOptimization(DEFAULT_SCENARIOS.default, [], 'Initial baseline');
         setResult(initialRes);
       } catch (e) {
-        console.error('Initial solve error:', e);
+        console.error('Initial baseline solve error:', e);
       }
     }
     init();
   }, []);
 
-  // Parse directives via Gemini
+  // Parse natural language directives via Gemini
   const handleParseDirectives = async (promptText) => {
     if (!promptText || !promptText.trim()) return;
     setIsParsingDirectives(true);
@@ -59,17 +64,17 @@ export default function App() {
       const res = await parseNaturalLanguagePrompt(promptText);
       if (res && res.directives) {
         setDirectives(res.directives);
-        showToast(`Extracted ${res.directives.length} operational directive(s).`);
+        showToast(`Gemini extracted ${res.directives.length} operational constraint(s).`);
       }
     } catch (err) {
-      console.error('Parse error:', err);
-      showToast('Directive parsing failed.');
+      console.error('Directive parse error:', err);
+      showToast('Directive parsing failed, using fallback.');
     } finally {
       setIsParsingDirectives(false);
     }
   };
 
-  // Run OR-Tools Optimization
+  // Run OR-Tools Optimization and transition to the next page!
   const handleRunOptimization = async () => {
     setIsLoading(true);
     try {
@@ -90,17 +95,25 @@ export default function App() {
       const updatedHistory = await fetchHistory();
       setHistoryList(updatedHistory);
 
-      showToast(`Optimization complete. Saved $${res.savings_amount.toFixed(2)} (${res.savings_pct.toFixed(1)}%).`);
-      setActiveTab('dashboard'); // Switch cleanly to dedicated Analytics view
+      showToast(`Optimal dispatch found! Saved ?${(res.savings_amount_bdt || res.savings_amount || 0).toFixed(2)} (+${res.savings_pct.toFixed(1)}%).`);
+      
+      // PRODUCE OUTPUT AND GRAPH IN NEXT PAGE:
+      setActiveTab('dashboard');
     } catch (err) {
-      console.error('Optimization run error:', err);
+      console.error('Optimization solve error:', err);
       showToast('Optimization failed. Check scenario constraints.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Select History Item
+  const handleNewOptimization = () => {
+    setOperatorPrompt('');
+    setDirectives([]);
+    setScenario(DEFAULT_SCENARIOS.default);
+    setActiveTab('optimizer');
+  };
+
   const handleSelectHistoryItem = (item) => {
     if (item.hourly_schedule) {
       setResult(item);
@@ -114,51 +127,122 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B1220] text-[#F9FAFB] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#111111] text-[#ececec] flex font-sans overflow-x-hidden">
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-[8px] border border-[#374151] bg-[#111827] text-[13px] text-[#F9FAFB] shadow-md flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl border border-[#333] bg-[#1a1a1a] text-xs font-mono text-slate-200 shadow-2xl flex items-center space-x-2 animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-sky-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Top Navbar */}
-      <Navbar
+      {/* ChatGPT-Style Sidebar */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onNewOptimization={handleNewOptimization}
+        scenario={scenario}
+        setScenario={setScenario}
+        presetScenarios={DEFAULT_SCENARIOS}
+        historyList={historyList}
+        onSelectHistoryItem={handleSelectHistoryItem}
         backendStatus={backendStatus}
         onOpenArchModal={() => setIsArchModalOpen(true)}
       />
 
-      {/* Clean Main Content - Dedicated Single View per Tab */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
+      {/* Main Content Area */}
+      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-200 ${isSidebarOpen ? 'lg:pl-64' : 'pl-0'}`}>
         
-        {/* TAB 1: OPERATOR CONSOLE */}
-        {activeTab === 'optimizer' && (
-          <div className="max-w-5xl mx-auto space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
-              <div>
-                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
-                  Operator Dispatch Console
-                </h1>
-                <p className="text-[14px] text-[#94A3B8] mt-0.5">
-                  Input operational instructions and select scenario to compute lowest-cost dispatch.
-                </p>
-              </div>
+        {/* Top Header Bar */}
+        <header className="sticky top-0 z-30 h-14 bg-[#111111]/90 backdrop-blur-md border-b border-[#222222] px-4 flex items-center justify-between">
+          
+          {/* Left: Sidebar Toggle & New Chat icon */}
+          <div className="flex items-center space-x-2">
+            {!isSidebarOpen && (
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#212121] transition-colors cursor-pointer"
+                title="Open Sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
 
-              {result && (
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className="text-[13px] text-[#2563EB] hover:text-[#60A5FA] font-medium flex items-center gap-1 cursor-pointer"
-                >
-                  <span>View Current Results →</span>
-                </button>
-              )}
-            </div>
+            <button
+              onClick={handleNewOptimization}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#212121] hover:bg-[#2c2c2c] text-slate-200 text-xs font-medium border border-[#2f2f2f] transition-all cursor-pointer"
+              title="New Optimization Prompt"
+            >
+              <Plus className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">New Optimization</span>
+            </button>
+          </div>
 
-            <OptimizationConsole
+          {/* Center: Clean Page View Switcher */}
+          <div className="flex items-center p-1 rounded-full bg-[#1c1c1c] border border-[#2e2e2e] text-xs">
+            <button
+              onClick={() => setActiveTab('optimizer')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
+                activeTab === 'optimizer' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
+              <span>Prompt Console</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
+                activeTab === 'dashboard' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Telemetry & Graphs</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className={`hidden md:flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
+                activeTab === 'schedule' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Table className="w-3.5 h-3.5 text-amber-400" />
+              <span>24h Schedule</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`hidden lg:flex items-center space-x-1.5 px-3 py-1 rounded-full transition-all cursor-pointer ${
+                activeTab === 'history' ? 'bg-[#2f2f2f] text-white font-medium shadow-xs' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <History className="w-3.5 h-3.5 text-slate-400" />
+              <span>Audit Log</span>
+            </button>
+          </div>
+
+          {/* Right: Architecture & Status */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsArchModalOpen(true)}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-[#1c1c1c] hover:bg-[#282828] text-slate-300 text-xs border border-[#2f2f2f] transition-colors cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">Architecture</span>
+            </button>
+          </div>
+
+        </header>
+
+        {/* Page Content Router */}
+        <main className="flex-1 flex flex-col px-4 sm:px-6 py-4">
+          
+          {/* PAGE 1: CHATGPT-STYLE PROMPT VIEW */}
+          {activeTab === 'optimizer' && (
+            <ChatPromptView
               scenario={scenario}
               setScenario={setScenario}
               directives={directives}
@@ -169,89 +253,63 @@ export default function App() {
               isLoading={isLoading}
               onParseDirectives={handleParseDirectives}
               isParsingDirectives={isParsingDirectives}
+              backendStatus={backendStatus}
             />
-          </div>
-        )}
+          )}
 
-        {/* TAB 2: DEDICATED TELEMETRY & ANALYTICS CHARTS */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
-              <div>
-                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
-                  Telemetry & Analytics
-                </h1>
-                <p className="text-[14px] text-[#94A3B8] mt-0.5">
-                  Real-time power dispatch breakdown, battery SOC trajectory, and cost arbitrage.
-                </p>
-              </div>
-
-              <button
-                onClick={() => setActiveTab('schedule')}
-                className="text-[13px] text-[#2563EB] hover:text-[#60A5FA] font-medium flex items-center gap-1 cursor-pointer"
-              >
-                <span>View Full Table Matrix →</span>
-              </button>
-            </div>
-
-            <ResultsDashboard result={result} />
-          </div>
-        )}
-
-        {/* TAB 3: DEDICATED HOURLY DISPATCH TABLE */}
-        {activeTab === 'schedule' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
-              <div>
-                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
-                  24-Hour Dispatch Schedule
-                </h1>
-                <p className="text-[14px] text-[#94A3B8] mt-0.5">
-                  Detailed hourly generation, storage charge/discharge, grid exchange, and cost breakdown.
-                </p>
-              </div>
-            </div>
-
-            <ScheduleTable result={result} />
-          </div>
-        )}
-
-        {/* TAB 4: DEDICATED AUDIT LOG / HISTORY */}
-        {activeTab === 'history' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
-              <div>
-                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
-                  Audit Log & Saved Runs
-                </h1>
-                <p className="text-[14px] text-[#94A3B8] mt-0.5">
-                  Historical optimization records persisted in PostgreSQL database.
-                </p>
-              </div>
-            </div>
-
-            <HistoryView
-              historyList={historyList}
-              onSelectHistoryItem={handleSelectHistoryItem}
+          {/* PAGE 2: TELEMETRY, ANALYTICS OUTPUTS & GRAPHS */}
+          {activeTab === 'dashboard' && (
+            <ResultsDashboard 
+              result={result} 
+              onBackToConsole={() => setActiveTab('optimizer')}
+              onNewRun={handleNewOptimization}
             />
-          </div>
-        )}
+          )}
 
-      </main>
+          {/* PAGE 3: 24-HOUR DISPATCH SCHEDULE MATRIX */}
+          {activeTab === 'schedule' && (
+            <div className="max-w-7xl w-full mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
+                <div>
+                  <h1 className="text-xl font-bold text-white">24-Hour Dispatch Schedule</h1>
+                  <p className="text-xs text-slate-400">Complete hourly SCADA power matrix and pricing</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className="text-xs text-sky-400 hover:underline font-mono"
+                >
+                  [VIEW GRAPHS ?]
+                </button>
+              </div>
+              <ScheduleTable result={result} />
+            </div>
+          )}
 
-      {/* Architecture Modal */}
+          {/* PAGE 4: AUDIT LOG / HISTORY */}
+          {activeTab === 'history' && (
+            <div className="max-w-7xl w-full mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
+                <div>
+                  <h1 className="text-xl font-bold text-white">Audit Log & Saved Scenarios</h1>
+                  <p className="text-xs text-slate-400">Database historical records and audit logs</p>
+                </div>
+              </div>
+              <HistoryView
+                historyList={historyList}
+                onSelectHistoryItem={handleSelectHistoryItem}
+              />
+            </div>
+          )}
+
+        </main>
+
+      </div>
+
+      {/* Architecture System Modal */}
       <ArchitectureModal
         isOpen={isArchModalOpen}
         onClose={() => setIsArchModalOpen(false)}
       />
-
-      {/* Footer */}
-      <footer className="border-t border-[#374151] bg-[#111827] py-4 text-center text-[12px] text-[#94A3B8]">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>GridWise AI – Energy Optimization Platform</span>
-          <span>Engine: <strong className="text-[#F9FAFB]">Google OR-Tools</strong> | NLP: <strong className="text-[#F9FAFB]">Gemini Flash</strong></span>
-        </div>
-      </footer>
 
     </div>
   );
