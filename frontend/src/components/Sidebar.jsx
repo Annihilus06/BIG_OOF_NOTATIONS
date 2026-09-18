@@ -118,15 +118,6 @@ export default function Sidebar({
 
         </div>
 
-        {/* Minimalist Bottom Status */}
-        <div className="p-3 border-t border-[#262626] bg-[#141414] flex items-center justify-between text-[11px]">
-          <span className="text-slate-400 font-mono">Engine Status</span>
-          <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-[#1c1c1c] border border-[#2a2a2a] text-[10px] font-mono">
-            <span className={`w-1.5 h-1.5 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            <span className="text-slate-300">{backendStatus === 'healthy' ? 'OR-Tools Live' : 'Simulation'}</span>
-          </div>
-        </div>
-
       </aside>
     </>
   );

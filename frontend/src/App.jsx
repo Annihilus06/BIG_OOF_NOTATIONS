@@ -289,13 +289,8 @@ export default function App() {
             </a>
           </nav>
 
-          {/* Right Status Indicator */}
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#1c1c1c] border border-[#2e2e2e] text-[11px] font-mono">
-              <span className={`w-2 h-2 rounded-full ${backendStatus === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span className="text-slate-300 hidden sm:inline">{backendStatus === 'healthy' ? 'OR-Tools Live' : 'Simulation'}</span>
-            </div>
-          </div>
+          {/* Placeholder for header balance or actions */}
+          <div className="w-10 sm:w-28 flex justify-end" />
 
         </header>
 
