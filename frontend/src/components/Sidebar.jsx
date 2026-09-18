@@ -116,49 +116,6 @@ export default function Sidebar({
             })}
           </div>
 
-          {/* Previous Runs History (Only real runs, no demo data) */}
-          {historyList && historyList.length > 0 && (
-            <div className="space-y-1 pt-2 border-t border-[#262626]">
-              <div className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                <span>Recent Runs</span>
-                {onClearHistory && (
-                  <button 
-                    onClick={onClearHistory}
-                    className="text-slate-400 hover:text-rose-400 p-0.5"
-                    title="Clear History"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-0.5">
-                {historyList.slice(0, 10).map((hist, idx) => (
-                  <button
-                    key={hist.id || idx}
-                    onClick={() => {
-                      onSelectHistoryItem(hist);
-                      setActiveTab('dashboard');
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#212121] transition-colors cursor-pointer truncate flex items-center justify-between group"
-                  >
-                    <div className="flex items-center space-x-2 truncate">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-400 shrink-0" />
-                      <span className="truncate text-[11px] text-slate-300 group-hover:text-white">
-                        {hist.scenario_name || 'Optimization Run'}
-                      </span>
-                    </div>
-                    {hist.savings_pct !== undefined && (
-                      <span className="text-[10px] font-mono text-emerald-400 shrink-0">
-                        +{hist.savings_pct}%
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
         </div>
 
         {/* Minimalist Bottom Status */}

@@ -98,7 +98,7 @@ export default function ChatPromptView({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-center items-center max-w-3xl w-full mx-auto px-4 py-8 select-none">
+    <div className="flex-1 flex flex-col justify-center items-center max-w-2xl w-full mx-auto px-4 py-6 select-none">
       
       {/* Hidden File Input for JSON attachment */}
       <input
@@ -110,21 +110,21 @@ export default function ChatPromptView({
       />
 
       {/* Top Clean Greeting (ChatGPT style) */}
-      <div className="w-full text-center space-y-3 mb-8">
-        <h1 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
+      <div className="w-full text-center space-y-2 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
           What can I optimize today?
         </h1>
-        <p className="text-slate-400 text-sm max-w-md mx-auto">
+        <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto">
           Attach a 24-hour grid scenario JSON, enter natural language operator notes, and compute lowest-cost mathematical dispatch.
         </p>
       </div>
 
       {/* Main Central Input Container (ChatGPT Style) */}
-      <div className="w-full space-y-3">
+      <div className="w-full space-y-2.5">
         
         {/* Error Notification */}
         {uploadError && (
-          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between">
+          <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{uploadError}</span>
@@ -135,23 +135,23 @@ export default function ChatPromptView({
           </div>
         )}
 
-        {/* The Sleek ChatGPT Prompt Pill */}
-        <div className="w-full bg-[#212121] rounded-2xl sm:rounded-3xl border border-[#2f2f2f] hover:border-[#3f3f3f] focus-within:border-[#555] transition-all shadow-xl p-3 sm:p-4 space-y-3">
+        {/* The Sleek Compact ChatGPT Prompt Pill */}
+        <div className="w-full bg-[#212121] rounded-2xl border border-[#2f2f2f] hover:border-[#3f3f3f] focus-within:border-[#555] transition-all shadow-lg p-2.5 sm:p-3 space-y-2">
           
           {/* Top Row: Attached JSON File or Scenario Tag */}
-          <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+          <div className="flex items-center justify-between flex-wrap gap-1.5 text-xs">
             {attachedFile ? (
-              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-sky-300 font-mono">
-                <FileJson className="w-3.5 h-3.5 text-sky-400" />
+              <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-md bg-[#2a2a2a] border border-[#3a3a3a] text-sky-300 font-mono text-[11px]">
+                <FileJson className="w-3 h-3 text-sky-400" />
                 <span>{attachedFile.name}</span>
-                <span className="text-slate-400 text-[11px]">({attachedFile.capacity} kWh)</span>
+                <span className="text-slate-400 text-[10px]">({attachedFile.capacity} kWh)</span>
                 <button
                   type="button"
                   onClick={handleRemoveAttachedFile}
                   className="text-slate-400 hover:text-rose-400 ml-1 cursor-pointer"
                   title="Remove attached JSON"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             ) : (
@@ -159,16 +159,16 @@ export default function ChatPromptView({
                 <button
                   type="button"
                   onClick={() => setShowScenarioMenu(!showScenarioMenu)}
-                  className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#1a1a1a] hover:bg-[#282828] border border-[#333] text-slate-300 text-xs transition-colors cursor-pointer"
+                  className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-[#1a1a1a] hover:bg-[#282828] border border-[#333] text-slate-300 text-[11px] transition-colors cursor-pointer"
                 >
-                  <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                  <Sliders className="w-3 h-3 text-amber-400" />
                   <span className="font-medium text-slate-200">{scenario.name}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                  <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
                 </button>
 
                 {showScenarioMenu && (
-                  <div className="absolute top-full left-0 mt-1.5 w-64 bg-[#1e1e1e] border border-[#333] rounded-xl shadow-2xl z-50 p-1.5 space-y-1">
-                    <div className="px-2 py-1 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  <div className="absolute top-full left-0 mt-1 w-60 bg-[#1e1e1e] border border-[#333] rounded-xl shadow-2xl z-50 p-1 space-y-0.5">
+                    <div className="px-2 py-0.5 text-[9px] uppercase font-bold text-slate-400 tracking-wider">
                       Select Scenario Profile
                     </div>
                     {Object.entries(DEFAULT_SCENARIOS).map(([key, item]) => (
@@ -179,7 +179,7 @@ export default function ChatPromptView({
                           setScenario(item);
                           setShowScenarioMenu(false);
                         }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-between ${
+                        className={`w-full text-left px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer flex items-center justify-between ${
                           scenario.name === item.name 
                             ? 'bg-[#2a2a2a] text-sky-300' 
                             : 'text-slate-300 hover:bg-[#262626] hover:text-white'
@@ -196,21 +196,21 @@ export default function ChatPromptView({
 
             {/* Directives count preview */}
             {directives.length > 0 && (
-              <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>{directives.length} active constraint(s)</span>
+              <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono">
+                <CheckCircle2 className="w-2.5 h-2.5" />
+                <span>{directives.length} constraint(s)</span>
               </div>
             )}
           </div>
 
-          {/* Center: Textarea Input */}
+          {/* Center: Sleek Compact Textarea Input */}
           <textarea
-            rows={3}
+            rows={2}
             value={operatorPrompt}
             onChange={(e) => setOperatorPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything or enter operator instructions (e.g. 'Cloud cover reducing solar to 30% from 1 PM to 4 PM, keep battery at 40% in evening peak')..."
-            className="w-full bg-transparent text-white placeholder-slate-500 text-sm sm:text-base outline-none resize-none font-sans leading-relaxed"
+            placeholder="Ask anything or enter operator instructions (e.g. 'Reduce solar to 30% from 1 PM to 4 PM')..."
+            className="w-full bg-transparent text-white placeholder-slate-500 text-xs sm:text-sm outline-none resize-none font-sans leading-relaxed min-h-[44px]"
           />
 
           {/* Bottom Bar: + Button on Left, Action Buttons on Right */}
@@ -221,36 +221,36 @@ export default function ChatPromptView({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#2a2a2a] hover:bg-[#333] text-slate-200 hover:text-white text-xs font-medium transition-all cursor-pointer group"
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#2a2a2a] hover:bg-[#333] text-slate-200 hover:text-white text-[11px] font-medium transition-all cursor-pointer group"
                 title="Attach 24h Scenario JSON file"
               >
-                <Plus className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline">Add JSON Scenario</span>
+                <Plus className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
+                <span>Add JSON Scenario</span>
               </button>
             </div>
 
-            {/* Right: Parse Directives & Circular Send (?) */}
-            <div className="flex items-center space-x-2">
+            {/* Right: Parse Directives & Circular Send (↑) */}
+            <div className="flex items-center space-x-1.5">
               
               {operatorPrompt.trim().length > 0 && (
                 <button
                   type="button"
                   onClick={() => onParseDirectives(operatorPrompt)}
                   disabled={isParsingDirectives}
-                  className="hidden sm:flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#1c1c1c] hover:bg-[#282828] text-slate-300 text-xs border border-[#333] transition-colors cursor-pointer"
+                  className="hidden sm:flex items-center space-x-1 px-2 py-1 rounded-full bg-[#1c1c1c] hover:bg-[#282828] text-slate-300 text-[11px] border border-[#333] transition-colors cursor-pointer"
                   title="Extract mathematical constraints with Gemini"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-                  <span>{isParsingDirectives ? 'Parsing...' : 'Parse Directives'}</span>
+                  <Sparkles className="w-3 h-3 text-sky-400" />
+                  <span>{isParsingDirectives ? 'Parsing...' : 'Parse'}</span>
                 </button>
               )}
 
-              {/* Circular Send (?) Button */}
+              {/* Circular Send (↑) Button */}
               <button
                 type="button"
                 onClick={onRunOptimization}
                 disabled={isLoading}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
                   isLoading
                     ? 'bg-slate-700 text-slate-400 cursor-wait'
                     : 'bg-white hover:bg-slate-200 text-black active:scale-95'
@@ -258,9 +258,9 @@ export default function ChatPromptView({
                 title="Run Optimization & View Output in Next Page"
               >
                 {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <ArrowUp className="w-5 h-5 font-bold stroke-[2.5]" />
+                  <ArrowUp className="w-4 h-4 font-bold stroke-[2.5]" />
                 )}
               </button>
 
