@@ -1,16 +1,19 @@
-"""
+﻿"""
 Supabase Database Integration for GridWise AI Platform
 Persists optimization runs with BDT currency, battery conservation metrics, and validation logs.
 """
 import os
 import datetime
 import requests
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from typing import List, Dict, Any, Optional
 from models import SolveResult, ScenarioData, Directive
+
+logger = logging.getLogger("gridwise.db")
 
 
 class DatabaseManager:
@@ -32,16 +35,27 @@ class DatabaseManager:
             "Prefer": "return=representation"
         }
 
-    def save_optimization(self, scenario: ScenarioData, directives: List[Directive], result: SolveResult, raw_prompt: Optional[str] = None) -> str:
+    def save_optimization(
+        self,
+        scenario: ScenarioData,
+        directives: List[Directive],
+        result: SolveResult,
+        raw_prompt: Optional[str] = None
+    ) -> str:
         """Saves scenario, directives, and optimization results to Supabase and local cache."""
         record_id = f"opt-{int(datetime.datetime.utcnow().timestamp())}"
         timestamp = datetime.datetime.utcnow().isoformat() + "Z"
-        result.created_at = timestamp
+
+        if hasattr(result, "created_at"):
+            try:
+                result.created_at = timestamp
+            except Exception:
+                pass
 
         record = {
             "id": record_id,
             "scenario_name": scenario.name,
-            "currency": "BDT (৳)",
+            "currency": "BDT",
             "raw_prompt": raw_prompt or "",
             "total_cost": float(result.total_cost_bdt),
             "baseline_cost": float(result.baseline_cost_bdt),
@@ -65,7 +79,7 @@ class DatabaseManager:
         # Save to local history
         self._local_history.insert(0, record)
 
-        # Insert directly to Supabase REST endpoint
+        # Insert to Supabase REST endpoint if configured
         if self.supabase_url and self.supabase_key:
             try:
                 endpoint = f"{self.supabase_url}/rest/v1/optimization_results"
@@ -85,11 +99,11 @@ class DatabaseManager:
                 }
                 resp = requests.post(endpoint, json=payload, headers=self._get_headers(), timeout=5)
                 if resp.status_code in [200, 201]:
-                    print("[DB] Successfully inserted record into Supabase optimization_results table!")
+                    logger.info("[DB] Successfully inserted record into Supabase optimization_results table!")
                 else:
-                    print(f"[DB] Supabase insert response ({resp.status_code}): {resp.text}")
+                    logger.debug(f"[DB] Supabase insert response ({resp.status_code}): {resp.text}")
             except Exception as e:
-                print(f"[DB] Supabase insert warning: {e}")
+                logger.debug(f"[DB] Supabase insert warning: {e}")
 
         return record_id
 
@@ -104,7 +118,7 @@ class DatabaseManager:
                     if data and isinstance(data, list) and len(data) > 0:
                         return data
             except Exception as e:
-                print(f"[DB] Supabase query warning: {e}")
+                logger.debug(f"[DB] Supabase query warning: {e}")
 
         return self._local_history[:limit]
 

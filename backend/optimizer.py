@@ -1,12 +1,12 @@
-"""
+﻿"""
 GridWise AI - Core Optimization Engine
-Linear Programming Dispatch Solver powered by Google OR-Tools (GLOP / SCIP).
-Strictly satisfies the canonical BUP CSE Fest Hackathon competition requirements:
-1. Physical 24h Energy Balance: Grid + Solar Used + Bat Disch == Demand + Bat Charge + Grid Export
-2. Strict End-of-Day Battery Conservation / Neutrality: Bat Energy [Hour 23] == Initial Bat Energy
-3. Dynamic Minimum Reserve Floor Enforcement
-4. Comprehensive Directive Adjustments: solar_reduction, min_reserve, no_charge, no_discharge, max_grid, no_op
-5. Accurate BDT Tariff & Cost Calculations
+Linear Programming Dispatch Solver powered by Google OR-Tools (GLOP).
+Strictly satisfies all BUP CSE Fest Hackathon canonical specifications:
+1. Multi-directive conflict resolution & compound aggregation.
+2. Infeasibility protection via heavily penalized slack variables (M = 10^6).
+3. Exact 24h Physical Power Balance: Grid + Solar Used + Bat Disch + Slack == Demand + Bat Charge.
+4. Linear Battery Dynamics with Strict End-of-Day Neutrality: Bat Energy [Hour 23] == Initial Bat Energy.
+5. Deterministic Battery Action labeling ('charge', 'discharge', 'idle').
 """
 
 import logging
@@ -28,6 +28,8 @@ from models import (
 
 logger = logging.getLogger("gridwise.optimizer")
 
+SLACK_PENALTY_M = 1000000.0
+
 
 def solve_competition_scenario(
     req: CompetitionScenarioRequest,
@@ -35,7 +37,7 @@ def solve_competition_scenario(
 ) -> CompetitionScenarioResponse:
     """
     Canonical Competition Solver:
-    Computes global lowest-cost 24h dispatch schedule adhering to official hackathon requirements.
+    Computes global lowest-cost 24h dispatch schedule adhering strictly to official hackathon requirements.
     """
     T = 24
     hours_range = range(T)
@@ -46,9 +48,9 @@ def solve_competition_scenario(
     if not solver:
         raise RuntimeError("Google OR-Tools GLOP solver could not be initialized.")
 
-    # 2. Process Directive Adjustments per Hour
-    solar_factors = [1.0] * T
-    min_reserve_soc = [(battery.capacity_kwh * (battery.min_reserve_percent / 100.0))] * T
+    # 2. Multi-Directive Merging & Conflict Resolution
+    effective_solar_factor = [1.0] * T
+    min_reserve_kwh = [battery.base_reserve_kwh] * T
     max_charge_limits = [battery.max_charge_kw] * T
     max_discharge_limits = [battery.max_discharge_kw] * T
     max_grid_limits = [solver.infinity()] * T
@@ -58,99 +60,107 @@ def solve_competition_scenario(
         if not interp.applies or interp.directive_type == "no_op":
             continue
             
-        target_hours = [h for h in interp.hours if 0 <= h < T]
+        target_hours = [h for h in (interp.target_hours or interp.hours or []) if 0 <= h < T]
         if not target_hours:
             target_hours = list(hours_range)
 
+        # Solar Reduction: Compound / lowest factor
         if interp.directive_type == "solar_reduction" and interp.factor is not None:
+            f = max(0.0, min(1.0, interp.factor))
             for h in target_hours:
-                solar_factors[h] = min(solar_factors[h], max(0.0, min(1.0, interp.factor)))
-                active_directives_by_hour[h].append(f"SOLAR_REDUCTION:{int(solar_factors[h]*100)}%")
+                effective_solar_factor[h] = min(effective_solar_factor[h], f)
+                active_directives_by_hour[h].append(f"SOLAR_REDUCTION:{int(f*100)}%")
 
-        elif interp.directive_type == "minimum_battery_reserve" and interp.min_soc_pct is not None:
-            for h in target_hours:
-                req_kwh = battery.capacity_kwh * max(0.0, min(1.0, interp.min_soc_pct))
-                min_reserve_soc[h] = max(min_reserve_soc[h], req_kwh)
-                active_directives_by_hour[h].append(f"MIN_RESERVE:{int(interp.min_soc_pct*100)}%")
+        # Minimum Battery Reserve: Elevate to max requested reserve floor
+        elif interp.directive_type == "minimum_battery_reserve":
+            req_kwh = interp.min_reserve_kwh
+            if req_kwh is None and interp.min_soc_pct is not None:
+                req_kwh = battery.capacity_kwh * interp.min_soc_pct
+            if req_kwh is not None:
+                req_kwh = max(0.0, min(battery.capacity_kwh, req_kwh))
+                for h in target_hours:
+                    min_reserve_kwh[h] = max(min_reserve_kwh[h], req_kwh)
+                    active_directives_by_hour[h].append(f"MIN_RESERVE:{req_kwh:.1f}kWh")
 
+        # No Charge Window: Hard-cap charge to 0
         elif interp.directive_type == "no_charge_window":
             for h in target_hours:
                 max_charge_limits[h] = 0.0
                 active_directives_by_hour[h].append("NO_CHARGE")
 
+        # No Discharge Window: Hard-cap discharge to 0
         elif interp.directive_type == "no_discharge_window":
             for h in target_hours:
                 max_discharge_limits[h] = 0.0
                 active_directives_by_hour[h].append("NO_DISCHARGE")
 
-        elif interp.directive_type == "max_grid_window" and interp.max_grid_kw is not None:
-            for h in target_hours:
-                max_grid_limits[h] = min(max_grid_limits[h], max(0.0, interp.max_grid_kw))
-                active_directives_by_hour[h].append(f"MAX_GRID:{interp.max_grid_kw}kW")
+        # Max Grid Window: Enforce lowest grid import cap
+        elif interp.directive_type == "max_grid_window":
+            g_cap = interp.max_grid_kwh if interp.max_grid_kwh is not None else interp.max_grid_kw
+            if g_cap is not None:
+                g_cap = max(0.0, g_cap)
+                for h in target_hours:
+                    max_grid_limits[h] = min(max_grid_limits[h], g_cap)
+                    active_directives_by_hour[h].append(f"MAX_GRID:{g_cap}kW")
 
     # 3. Decision Variables
+    grid_kwh = {}
     solar_used = {}
     battery_charge = {}
     battery_discharge = {}
-    grid_import = {}
-    grid_export = {}
-    battery_energy = {}
+    battery_energy_after = {}
+    slack_unmet = {}
 
     eta_ch = battery.charge_efficiency
     eta_dis = battery.discharge_efficiency
 
     for h in hours_range:
         h_data = req.hours[h]
-        eff_solar = h_data.solar_kwh * solar_factors[h]
+        eff_solar = h_data.solar_kwh * effective_solar_factor[h]
 
+        grid_kwh[h] = solver.NumVar(0.0, max_grid_limits[h], f"grid_{h}")
         solar_used[h] = solver.NumVar(0.0, eff_solar, f"solar_used_{h}")
         battery_charge[h] = solver.NumVar(0.0, max_charge_limits[h], f"bat_chg_{h}")
         battery_discharge[h] = solver.NumVar(0.0, max_discharge_limits[h], f"bat_dis_{h}")
-        grid_import[h] = solver.NumVar(0.0, max_grid_limits[h], f"grid_in_{h}")
-        grid_export[h] = solver.NumVar(0.0, solver.infinity(), f"grid_out_{h}")
-        battery_energy[h] = solver.NumVar(min_reserve_soc[h], battery.capacity_kwh, f"soc_{h}")
+        battery_energy_after[h] = solver.NumVar(min_reserve_kwh[h], battery.capacity_kwh, f"soc_{h}")
+        slack_unmet[h] = solver.NumVar(0.0, solver.infinity(), f"slack_{h}")
 
-    # 4. Energy Conservation & Dynamic Constraints
+    # 4. Energy Conservation & Battery Dynamic Constraints
     for h in hours_range:
         h_data = req.hours[h]
         demand = h_data.demand_kwh
 
-        # Exact Power Balance: Grid + Solar Used + Bat Discharge == Demand + Bat Charge + Grid Export
+        # Exact Energy Balance:
         solver.Add(
-            grid_import[h] + solar_used[h] + battery_discharge[h]
-            == demand + battery_charge[h] + grid_export[h]
+            grid_kwh[h] + solar_used[h] + battery_discharge[h] + slack_unmet[h]
+            == demand + battery_charge[h]
         )
 
-        # Battery Dynamic SOC State Update
-        prev_energy = battery.initial_energy_kwh if h == 0 else battery_energy[h - 1]
+        # Linear Battery Dynamics:
+        prev_energy = battery.initial_energy_kwh if h == 0 else battery_energy_after[h - 1]
         solver.Add(
-            battery_energy[h] == prev_energy + (battery_charge[h] * eta_ch) - (battery_discharge[h] / eta_dis)
+            battery_energy_after[h] == prev_energy + (battery_charge[h] * eta_ch) - (battery_discharge[h] / eta_dis)
         )
 
-    # 5. Strict End-of-Day Neutrality Constraint: Bat Energy[Hour 23] == Initial Bat Energy
-    solver.Add(battery_energy[23] == battery.initial_energy_kwh)
+    # 5. Strict End-of-Day Neutrality Constraint:
+    solver.Add(battery_energy_after[23] == battery.initial_energy_kwh)
 
-    # 6. Objective: Minimize Total 24h Net BDT Cost
+    # 6. Objective Function:
     objective = solver.Objective()
     for h in hours_range:
         h_data = req.hours[h]
-        import_price = h_data.tariff_bdt_per_kwh
-        export_price = h_data.feed_in_tariff_bdt_per_kwh if h_data.feed_in_tariff_bdt_per_kwh is not None else 0.0
-        
-        # Grid import cost
-        objective.SetCoefficient(grid_import[h], import_price)
-        # Grid export revenue (negative cost)
-        objective.SetCoefficient(grid_export[h], -export_price)
-        # Minimal penalty to prefer using solar over curtailment
-        objective.SetCoefficient(solar_used[h], -0.001)
+        tariff = h_data.tariff_bdt_per_kwh
+        objective.SetCoefficient(grid_kwh[h], tariff)
+        objective.SetCoefficient(slack_unmet[h], SLACK_PENALTY_M)
+        objective.SetCoefficient(solar_used[h], -0.0001)
 
     objective.SetMinimization()
 
-    # Solve Linear Program
+    # 7. Solve Linear Program
     status = solver.Solve()
 
     if status not in [pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE]:
-        # Return fallback response with validation failure notice
+        logger.error("OR-Tools GLOP solver returned non-optimal status.")
         return CompetitionScenarioResponse(
             scenario_id=req.scenario_id,
             directive_interpretation=interpretations,
@@ -158,13 +168,13 @@ def solve_competition_scenario(
             total_grid_kwh=0.0,
             total_cost_bdt=0.0,
             peak_grid_kwh=0.0,
-            plan_summary="Solver failed to find a feasible dispatch plan satisfying all hard constraints.",
+            plan_summary="Solver failed to find a feasible dispatch plan.",
             solver_status="INFEASIBLE",
             battery_end_of_day_neutral=False,
             validation_passed=False
         )
 
-    # 7. Extract Solution & Build Response
+    # 8. Response Serialization & Strict Formatting
     total_grid_kwh = 0.0
     total_cost_bdt = 0.0
     peak_grid_kwh = 0.0
@@ -175,18 +185,24 @@ def solve_competition_scenario(
         s_used = round(solar_used[h].solution_value(), 4)
         b_chg = round(battery_charge[h].solution_value(), 4)
         b_dis = round(battery_discharge[h].solution_value(), 4)
-        g_in = round(grid_import[h].solution_value(), 4)
-        g_out = round(grid_export[h].solution_value(), 4)
-        soc_val = round(battery_energy[h].solution_value(), 4)
+        g_in = round(grid_kwh[h].solution_value(), 4)
+        soc_val = round(battery_energy_after[h].solution_value(), 4)
         soc_pct = round((soc_val / battery.capacity_kwh) * 100.0, 2)
+        slack_val = round(slack_unmet[h].solution_value(), 4)
         
         tariff = h_data.tariff_bdt_per_kwh
-        fit = h_data.feed_in_tariff_bdt_per_kwh or 0.0
-        h_cost = round((g_in * tariff) - (g_out * fit), 4)
+        h_cost = round(g_in * tariff, 4)
 
         total_grid_kwh += g_in
         total_cost_bdt += h_cost
         peak_grid_kwh = max(peak_grid_kwh, g_in)
+
+        # Mutual Action Exclusivity Labeling
+        action = "idle"
+        if b_chg > 0.001:
+            action = "charge"
+        elif b_dis > 0.001:
+            action = "discharge"
 
         hourly_plan.append(HourlyPlanItem(
             hour=h,
@@ -198,7 +214,9 @@ def solve_competition_scenario(
             grid_kwh=g_in,
             tariff_bdt_per_kwh=tariff,
             hourly_cost_bdt=h_cost,
-            active_directives=active_directives_by_hour[h]
+            active_directives=active_directives_by_hour[h],
+            battery_action=action,
+            slack_unmet_kwh=slack_val
         ))
 
     total_grid_kwh = round(total_grid_kwh, 2)
@@ -207,12 +225,12 @@ def solve_competition_scenario(
 
     # Validate end-of-day battery neutrality
     final_soc = hourly_plan[-1].battery_energy_after_kwh
-    is_neutral = abs(final_soc - battery.initial_energy_kwh) <= 0.05
+    is_neutral = abs(final_soc - battery.initial_energy_kwh) <= 0.01
 
     summary = (
         f"OR-Tools GLOP optimal dispatch completed. Total 24h Cost: BDT {total_cost_bdt:.2f}, "
         f"Total Grid: {total_grid_kwh:.2f} kWh, Peak Grid: {peak_grid_kwh:.2f} kW. "
-        f"End-of-day battery neutrality strictly verified ({battery.initial_energy_kwh:.1f} kWh -> {final_soc:.1f} kWh)."
+        f"End-of-day battery neutrality strictly verified ({battery.initial_energy_kwh:.2f} kWh -> {final_soc:.2f} kWh)."
     )
 
     return CompetitionScenarioResponse(
@@ -241,7 +259,6 @@ def solve_energy_dispatch(
     T = 24
     hours = range(T)
 
-    # Convert ScenarioData to CompetitionScenarioRequest format
     comp_req = CompetitionScenarioRequest(
         scenario_id=scenario.name,
         operator_notes=[],
@@ -266,7 +283,6 @@ def solve_energy_dispatch(
         ]
     )
 
-    # Directive interpretations from UI Directives
     interps = []
     for d in directives:
         if not d.applied:
@@ -283,28 +299,29 @@ def solve_energy_dispatch(
             max_grid = d.max_grid_kw if d.max_grid_kw is not None else d.value
 
         interps.append(DirectiveInterpretation(
+            raw_instruction=d.notes or f"{d.directive_type} on hours {d.hours}",
             raw_note=d.notes or f"{d.directive_type} on hours {d.hours}",
             applies=True,
             directive_type=d.directive_type,
+            target_hours=d.hours,
             hours=d.hours,
             factor=factor,
             min_soc_pct=min_soc,
+            max_grid_kwh=max_grid,
             max_grid_kw=max_grid,
+            clarification_notes=d.notes or d.status_message or f"Directive {d.id} active",
             notes=d.notes or d.status_message or f"Directive {d.id} active"
         ))
 
-    # Baseline cost (No battery dispatch, direct grid import for remainder)
     baseline_cost_bdt = 0.0
     for h in hours:
         load = scenario.load_profile[h]
         solar = scenario.solar_profile[h]
         tariff = scenario.tariff_profile[h]
-        fit = (scenario.feed_in_tariff[h] if scenario.feed_in_tariff else 0.0)
         
         base_solar_used = min(load, solar)
         base_grid_in = load - base_solar_used
-        base_surplus = solar - base_solar_used
-        baseline_cost_bdt += (base_grid_in * tariff) - (base_surplus * fit)
+        baseline_cost_bdt += (base_grid_in * tariff)
 
     baseline_cost_bdt = round(baseline_cost_bdt, 2)
 

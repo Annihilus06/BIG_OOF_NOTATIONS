@@ -1,4 +1,4 @@
-"""
+﻿"""
 GridWise AI - FastAPI Backend Server
 Official Competition & Platform Endpoints.
 Orchestrates Gemini NLP Directives, Google OR-Tools LP, and Supabase Database.
@@ -54,17 +54,14 @@ def health_check():
 def optimize_energy_canonical(req: CompetitionScenarioRequest):
     """
     Official Competition Judging Endpoint:
-    1. Interprets operator_notes array via Gemini Flash or deterministic parser.
-    2. Enforces strict 24h power balance, battery reserves, and End-of-Day Neutrality.
-    3. Returns structured directives, 24h hourly dispatch plan, and BDT costs.
+    1. Interprets and auto-normalizes operator_notes array.
+    2. Enforces strict 24h power balance, battery limits, and End-of-Day Neutrality.
+    3. Resolves overlapping multi-directive conflicts.
+    4. Returns structured directives, 24h hourly dispatch plan, and BDT costs.
     """
     try:
-        # Interpret directives
-        interpretations = interpret_operator_notes(req.operator_notes)
-
-        # Solve via Google OR-Tools
+        interpretations = interpret_operator_notes(req.operator_notes, req.battery)
         result = solve_competition_scenario(req, interpretations)
-
         return result
     except Exception as e:
         logger.error(f"Competition optimization error: {e}", exc_info=True)
@@ -97,12 +94,19 @@ def solve_scenario(req: SolveRequest):
 def optimize_end_to_end(req: OptimizeNLRequest):
     """
     Combined End-to-End Endpoint:
-    1. Translates prompt to directives via Gemini.
+    1. Translates prompt to directives.
     2. Solves Google OR-Tools LP model.
     3. Logs to Supabase and returns full analytics.
     """
     scenario = req.scenario or DEFAULT_SCENARIO
-    directives_container = parse_operator_instructions(req.prompt or "")
+    battery = BatterySpec(
+        capacity_kwh=scenario.battery_capacity_kwh,
+        initial_energy_kwh=scenario.initial_soc_kwh,
+        min_reserve_percent=scenario.min_soc_pct * 100.0,
+        max_charge_kw=scenario.max_charge_kw,
+        max_discharge_kw=scenario.max_discharge_kw
+    )
+    directives_container = parse_operator_instructions(req.prompt or "", battery)
     directives = directives_container.directives
 
     result = solve_energy_dispatch(scenario, directives)
@@ -116,7 +120,7 @@ def optimize_end_to_end(req: OptimizeNLRequest):
 @app.post("/process-nl", response_model=DirectivesContainer)
 def process_natural_language(req: ParseNLRequest):
     """
-    Translates operator natural language notes into structured directives JSON via Gemini.
+    Translates operator natural language notes into structured directives JSON.
     """
     if not req.prompt.strip():
         raise HTTPException(status_code=400, detail="Operator prompt cannot be empty.")
