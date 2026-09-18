@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
-import HeroSection from './components/HeroSection';
 import OptimizationConsole from './components/OptimizationConsole';
 import ResultsDashboard from './components/ResultsDashboard';
 import ScheduleTable from './components/ScheduleTable';
@@ -43,7 +42,7 @@ export default function App() {
       setHistoryList(history);
 
       try {
-        const initialRes = await runOptimization(DEFAULT_SCENARIOS.default, [], 'Initial benchmark baseline');
+        const initialRes = await runOptimization(DEFAULT_SCENARIOS.default, [], 'Initial baseline');
         setResult(initialRes);
       } catch (e) {
         console.error('Initial solve error:', e);
@@ -60,7 +59,7 @@ export default function App() {
       const res = await parseNaturalLanguagePrompt(promptText);
       if (res && res.directives) {
         setDirectives(res.directives);
-        showToast(`Parsed ${res.directives.length} directive(s) via Gemini Flash.`);
+        showToast(`Extracted ${res.directives.length} operational directive(s).`);
       }
     } catch (err) {
       console.error('Parse error:', err);
@@ -91,8 +90,8 @@ export default function App() {
       const updatedHistory = await fetchHistory();
       setHistoryList(updatedHistory);
 
-      showToast(`Optimal dispatch found! Saved $${res.savings_amount.toFixed(2)} (+${res.savings_pct.toFixed(1)}%).`);
-      setActiveTab('dashboard');
+      showToast(`Optimization complete. Saved $${res.savings_amount.toFixed(2)} (${res.savings_pct.toFixed(1)}%).`);
+      setActiveTab('dashboard'); // Switch cleanly to dedicated Analytics view
     } catch (err) {
       console.error('Optimization run error:', err);
       showToast('Optimization failed. Check scenario constraints.');
@@ -101,32 +100,7 @@ export default function App() {
     }
   };
 
-  // Quick Run
-  const handleQuickRun = async (presetPrompt) => {
-    setOperatorPrompt(presetPrompt);
-    setIsLoading(true);
-    try {
-      const parsedRes = await parseNaturalLanguagePrompt(presetPrompt);
-      const parsedDirs = parsedRes?.directives || [];
-      setDirectives(parsedDirs);
-
-      const res = await runOptimization(DEFAULT_SCENARIOS.default, parsedDirs, presetPrompt);
-      setResult(res);
-      saveLocalHistory(res, DEFAULT_SCENARIOS.default, parsedDirs, presetPrompt);
-
-      const updatedHistory = await fetchHistory();
-      setHistoryList(updatedHistory);
-
-      showToast(`Solar contingency simulated! Saved $${res.savings_amount.toFixed(2)}.`);
-      setActiveTab('dashboard');
-    } catch (err) {
-      console.error('Quick run error:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Select History
+  // Select History Item
   const handleSelectHistoryItem = (item) => {
     if (item.hourly_schedule) {
       setResult(item);
@@ -135,7 +109,7 @@ export default function App() {
         setDirectives(item.directives_applied);
       }
       setActiveTab('dashboard');
-      showToast(`Loaded historical record: ${item.scenario_name}`);
+      showToast(`Loaded scenario: ${item.scenario_name}`);
     }
   };
 
@@ -144,7 +118,7 @@ export default function App() {
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-[10px] border border-[#374151] bg-[#111827] text-[13px] text-[#F9FAFB] shadow-lg flex items-center space-x-2">
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-[8px] border border-[#374151] bg-[#111827] text-[13px] text-[#F9FAFB] shadow-md flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
           <span>{toastMessage}</span>
         </div>
@@ -158,18 +132,32 @@ export default function App() {
         onOpenArchModal={() => setIsArchModalOpen(true)}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Clean Main Content - Dedicated Single View per Tab */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
         
-        {/* Context Bar */}
-        <HeroSection
-          scenario={scenario}
-          onQuickRun={handleQuickRun}
-        />
-
-        {/* Tab Content */}
+        {/* TAB 1: OPERATOR CONSOLE */}
         {activeTab === 'optimizer' && (
-          <div className="space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
+              <div>
+                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
+                  Operator Dispatch Console
+                </h1>
+                <p className="text-[14px] text-[#94A3B8] mt-0.5">
+                  Input operational instructions and select scenario to compute lowest-cost dispatch.
+                </p>
+              </div>
+
+              {result && (
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className="text-[13px] text-[#2563EB] hover:text-[#60A5FA] font-medium flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View Current Results →</span>
+                </button>
+              )}
+            </div>
+
             <OptimizationConsole
               scenario={scenario}
               setScenario={setScenario}
@@ -182,40 +170,71 @@ export default function App() {
               onParseDirectives={handleParseDirectives}
               isParsingDirectives={isParsingDirectives}
             />
-
-            {/* Latest Result Summary */}
-            {result && (
-              <div className="pt-2 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-semibold text-[#94A3B8] uppercase tracking-wider">
-                    Latest Solved Dispatch Overview
-                  </h3>
-                  <button
-                    onClick={() => setActiveTab('dashboard')}
-                    className="text-[13px] text-[#2563EB] hover:underline font-medium cursor-pointer"
-                  >
-                    View Complete Analytics Charts →
-                  </button>
-                </div>
-                <ResultsDashboard result={result} />
-              </div>
-            )}
           </div>
         )}
 
+        {/* TAB 2: DEDICATED TELEMETRY & ANALYTICS CHARTS */}
         {activeTab === 'dashboard' && (
-          <ResultsDashboard result={result} />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
+              <div>
+                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
+                  Telemetry & Analytics
+                </h1>
+                <p className="text-[14px] text-[#94A3B8] mt-0.5">
+                  Real-time power dispatch breakdown, battery SOC trajectory, and cost arbitrage.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setActiveTab('schedule')}
+                className="text-[13px] text-[#2563EB] hover:text-[#60A5FA] font-medium flex items-center gap-1 cursor-pointer"
+              >
+                <span>View Full Table Matrix →</span>
+              </button>
+            </div>
+
+            <ResultsDashboard result={result} />
+          </div>
         )}
 
+        {/* TAB 3: DEDICATED HOURLY DISPATCH TABLE */}
         {activeTab === 'schedule' && (
-          <ScheduleTable result={result} />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
+              <div>
+                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
+                  24-Hour Dispatch Schedule
+                </h1>
+                <p className="text-[14px] text-[#94A3B8] mt-0.5">
+                  Detailed hourly generation, storage charge/discharge, grid exchange, and cost breakdown.
+                </p>
+              </div>
+            </div>
+
+            <ScheduleTable result={result} />
+          </div>
         )}
 
+        {/* TAB 4: DEDICATED AUDIT LOG / HISTORY */}
         {activeTab === 'history' && (
-          <HistoryView
-            historyList={historyList}
-            onSelectHistoryItem={handleSelectHistoryItem}
-          />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#374151]">
+              <div>
+                <h1 className="text-[24px] font-bold text-[#F9FAFB] tracking-tight">
+                  Audit Log & Saved Runs
+                </h1>
+                <p className="text-[14px] text-[#94A3B8] mt-0.5">
+                  Historical optimization records persisted in PostgreSQL database.
+                </p>
+              </div>
+            </div>
+
+            <HistoryView
+              historyList={historyList}
+              onSelectHistoryItem={handleSelectHistoryItem}
+            />
+          </div>
         )}
 
       </main>
@@ -229,7 +248,7 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-[#374151] bg-[#111827] py-4 text-center text-[12px] text-[#94A3B8]">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>GridWise AI – Enterprise Energy Management Platform</span>
+          <span>GridWise AI – Energy Optimization Platform</span>
           <span>Engine: <strong className="text-[#F9FAFB]">Google OR-Tools</strong> | NLP: <strong className="text-[#F9FAFB]">Gemini Flash</strong></span>
         </div>
       </footer>

@@ -1,7 +1,8 @@
-﻿"""
-Pydantic Models for GridWise AI Platform
 """
-from typing import List, Optional, Literal, Union, Dict, Any
+Pydantic Data Models for GridWise AI Platform
+Enforces strict mathematical typing, BDT currency, and directive validation.
+"""
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -17,11 +18,13 @@ DirectiveType = Literal[
 
 class Directive(BaseModel):
     directive_type: DirectiveType = Field(..., description="Type of energy operator directive")
-    hours: List[int] = Field(default_factory=list, description="List of hour indices (0-23) this directive applies to")
-    factor: Optional[float] = Field(None, description="Multiplication factor (e.g., 0.2 for 20% solar reduction)")
+    hours: List[int] = Field(default_factory=list, description="List of hour indices (0-23)")
+    factor: Optional[float] = Field(None, description="Multiplication factor (0.0 - 1.0)")
     min_soc_pct: Optional[float] = Field(None, description="Minimum battery state of charge fraction (0.0 - 1.0)")
     max_grid_kw: Optional[float] = Field(None, description="Maximum allowed grid import (kW)")
-    notes: Optional[str] = Field(None, description="Explanation or reasoning")
+    notes: Optional[str] = Field(None, description="Operator explanation or note")
+    applied: bool = Field(default=True, description="Whether directive was mathematically enforced")
+    status_message: Optional[str] = Field(default="ENFORCED", description="Enforcement status message")
 
     @field_validator("hours")
     def validate_hours(cls, v):
@@ -49,23 +52,23 @@ class DirectivesContainer(BaseModel):
 
 
 class ScenarioData(BaseModel):
-    name: str = Field(default="Default 24h Scenario", description="Scenario identifier")
+    name: str = Field(default="Standard 24h Microgrid", description="Scenario identifier")
     description: Optional[str] = Field(default="", description="Scenario description")
-    battery_capacity_kwh: float = Field(default=20.0, ge=1.0, description="Total battery capacity in kWh")
-    max_charge_kw: float = Field(default=5.0, ge=0.1, description="Maximum battery charging rate in kW")
-    max_discharge_kw: float = Field(default=5.0, ge=0.1, description="Maximum battery discharging rate in kW")
-    initial_soc_kwh: float = Field(default=10.0, ge=0.0, description="Initial battery energy level in kWh")
-    final_soc_target_kwh: Optional[float] = Field(default=10.0, ge=0.0, description="Target ending battery energy level in kWh")
-    battery_efficiency: float = Field(default=0.95, gt=0.0, le=1.0, description="One-way battery efficiency")
-    min_soc_pct: float = Field(default=0.10, ge=0.0, le=0.5, description="Default minimum battery SOC floor (0.0-1.0)")
-    max_soc_pct: float = Field(default=0.95, ge=0.5, le=1.0, description="Default maximum battery SOC ceiling (0.0-1.0)")
-    degradation_cost_per_kwh: float = Field(default=0.005, ge=0.0, description="Battery wear cost ($/kWh cycled)")
+    battery_capacity_kwh: float = Field(default=40.0, ge=1.0, description="Total battery capacity in kWh")
+    max_charge_kw: float = Field(default=10.0, ge=0.1, description="Maximum charging rate in kW")
+    max_discharge_kw: float = Field(default=10.0, ge=0.1, description="Maximum discharging rate in kW")
+    initial_soc_kwh: float = Field(default=20.0, ge=0.0, description="Initial battery energy level in kWh")
+    final_soc_target_kwh: Optional[float] = Field(default=20.0, ge=0.0, description="Target final battery energy in kWh (must equal initial)")
+    battery_efficiency: float = Field(default=0.95, gt=0.0, le=1.0, description="Battery one-way charging/discharging efficiency")
+    min_soc_pct: float = Field(default=0.15, ge=0.0, le=0.5, description="Default minimum reserve fraction (0.0-1.0)")
+    max_soc_pct: float = Field(default=0.95, ge=0.5, le=1.0, description="Maximum SOC ceiling fraction (0.0-1.0)")
+    degradation_cost_bdt_per_kwh: float = Field(default=0.25, ge=0.0, description="Battery wear cost (৳/kWh cycled)")
     
     # 24-hour profiles
-    load_profile: List[float] = Field(..., description="24-hour electrical demand profile (kWh per hour)")
-    solar_profile: List[float] = Field(..., description="24-hour solar generation profile (kWh per hour)")
-    tariff_profile: List[float] = Field(..., description="24-hour grid purchase tariff ($/kWh)")
-    feed_in_tariff: Optional[List[float]] = Field(default=None, description="24-hour grid export sell price ($/kWh)")
+    load_profile: List[float] = Field(..., description="24-hour demand profile in kWh")
+    solar_profile: List[float] = Field(..., description="24-hour solar generation in kWh")
+    tariff_profile: List[float] = Field(..., description="24-hour grid purchase tariff (৳/kWh)")
+    feed_in_tariff: Optional[List[float]] = Field(default=None, description="24-hour grid export price (৳/kWh)")
 
     @field_validator("load_profile", "solar_profile", "tariff_profile")
     def validate_24_hours(cls, v, info):
@@ -86,7 +89,7 @@ class ParseNLRequest(BaseModel):
 
 class OptimizeNLRequest(BaseModel):
     prompt: Optional[str] = Field(default="", description="Operator instructions")
-    scenario: Optional[ScenarioData] = Field(default=None, description="Optional custom scenario. If omitted, default baseline is used.")
+    scenario: Optional[ScenarioData] = Field(default=None, description="Optional custom scenario")
 
 
 class HourlyScheduleItem(BaseModel):
@@ -103,20 +106,27 @@ class HourlyScheduleItem(BaseModel):
     battery_soc_pct: float
     grid_import_kwh: float
     grid_export_kwh: float
-    tariff_per_kwh: float
-    feed_in_tariff_per_kwh: float
-    hourly_cost: float
+    tariff_bdt_per_kwh: float
+    feed_in_tariff_bdt_per_kwh: float
+    hourly_cost_bdt: float
+    is_valid: bool = Field(default=True, description="Hourly power balance and constraint validation status")
+    validation_note: Optional[str] = Field(default="VALID", description="Hourly validation note")
     active_directives: List[str] = Field(default_factory=list)
 
 
 class SolveResult(BaseModel):
     success: bool
-    solver_status: str
+    solver_status: str = Field(..., description="OPTIMAL, FEASIBLE, or INVALID")
     scenario_name: str
-    total_cost: float
-    baseline_cost: float
-    savings_amount: float
+    currency: str = Field(default="BDT (৳)", description="Currency unit")
+    
+    # Financial metrics in BDT
+    total_cost_bdt: float
+    baseline_cost_bdt: float
+    savings_amount_bdt: float
     savings_pct: float
+    
+    # Energy metrics (kWh)
     total_solar_generated_kwh: float
     total_solar_used_kwh: float
     total_solar_curtailed_kwh: float
@@ -126,7 +136,18 @@ class SolveResult(BaseModel):
     total_battery_charged_kwh: float
     total_battery_discharged_kwh: float
     peak_grid_demand_kw: float
+    
+    # Battery balance check
+    initial_battery_kwh: float
+    final_battery_kwh: float
+    battery_energy_balanced: bool = Field(..., description="True if final energy == initial energy")
+    
+    # Directives & Schedule
     directives_applied: List[Directive]
     hourly_schedule: List[HourlyScheduleItem]
+    
+    # Validation
+    validation_passed: bool
+    validation_errors: List[str] = Field(default_factory=list)
     explanation: Optional[str] = None
     created_at: Optional[str] = None

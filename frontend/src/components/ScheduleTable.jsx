@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Table, Search } from 'lucide-react';
+import { Download, Table, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -27,13 +27,14 @@ export default function ScheduleTable({ result }) {
       'Solar_Curtailed_kWh',
       'Battery_Charge_kWh',
       'Battery_Discharge_kWh',
-      'Battery_SOC_kWh',
+      'Battery_Energy_kWh',
       'Battery_SOC_Pct',
       'Grid_Import_kWh',
       'Grid_Export_kWh',
-      'Tariff_USD_kWh',
-      'Hourly_Cost_USD',
-      'Directives'
+      'Tariff_BDT_per_kWh',
+      'Hourly_Cost_BDT',
+      'Directives',
+      'Validation_Status'
     ];
 
     const rows = result.hourly_schedule.map(item => [
@@ -48,16 +49,17 @@ export default function ScheduleTable({ result }) {
       item.battery_soc_pct,
       item.grid_import_kwh,
       item.grid_export_kwh,
-      item.tariff_per_kwh,
-      item.hourly_cost,
-      `"${(item.active_directives || []).join('; ')}"`
+      item.tariff_bdt_per_kwh ?? item.tariff_per_kwh,
+      item.hourly_cost_bdt ?? item.hourly_cost,
+      `"${(item.active_directives || []).join('; ')}"`,
+      item.is_valid !== false ? 'VALID' : 'INVALID'
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `gridwise_dispatch_${result.scenario_name.replace(/\s+/g, '_')}.csv`);
+    link.setAttribute('download', `gridwise_24h_schedule_${result.scenario_name.replace(/\s+/g, '_')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -79,10 +81,10 @@ export default function ScheduleTable({ result }) {
         <div>
           <h2 className="text-[16px] font-semibold text-[#F9FAFB] flex items-center gap-2">
             <Table className="w-4 h-4 text-[#2563EB]" />
-            24-Hour Energy Dispatch Schedule Matrix
+            24-Hour Energy Dispatch Schedule Matrix (BDT ৳)
           </h2>
           <p className="text-[12px] text-[#94A3B8] mt-0.5">
-            Optimal hour-by-hour power allocation, battery states, and cost breakdown.
+            Verified hour-by-hour power allocation, storage dynamics, and tariff costs.
           </p>
         </div>
 
@@ -90,7 +92,7 @@ export default function ScheduleTable({ result }) {
           <div className="w-48 sm:w-64">
             <Input
               type="text"
-              placeholder="Filter by time or directive..."
+              placeholder="Search hour or directive..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="py-1.5 text-[12px]"
@@ -114,14 +116,15 @@ export default function ScheduleTable({ result }) {
           <table className="w-full text-left text-[13px] font-mono">
             <thead className="sticky top-0 bg-[#0B1220] text-[#94A3B8] uppercase text-[11px] font-semibold tracking-wider border-b border-[#374151]">
               <tr>
-                <th className="px-4 py-3">Time</th>
+                <th className="px-4 py-3">Hour</th>
                 <th className="px-3 py-3 text-right">Demand</th>
                 <th className="px-3 py-3 text-right text-[#EAB308]">Solar (Avail/Used)</th>
                 <th className="px-3 py-3 text-right text-[#22C55E]">Battery (Chg/Dis)</th>
-                <th className="px-3 py-3 text-right text-[#60A5FA]">SOC (%)</th>
+                <th className="px-3 py-3 text-right text-[#60A5FA]">Energy (SOC %)</th>
                 <th className="px-3 py-3 text-right text-[#F87171]">Grid Import</th>
-                <th className="px-3 py-3 text-right text-[#94A3B8]">Tariff</th>
-                <th className="px-3 py-3 text-right">Cost ($)</th>
+                <th className="px-3 py-3 text-right text-[#94A3B8]">Tariff (৳)</th>
+                <th className="px-3 py-3 text-right">Cost (৳)</th>
+                <th className="px-3 py-3 text-center">Status</th>
                 <th className="px-4 py-3">Directives</th>
               </tr>
             </thead>
@@ -129,6 +132,8 @@ export default function ScheduleTable({ result }) {
               {filtered.map((row, index) => {
                 const isEven = index % 2 === 0;
                 const hasDirectives = row.active_directives && row.active_directives.length > 0;
+                const isValid = row.is_valid !== false;
+
                 return (
                   <tr
                     key={row.hour}
@@ -159,8 +164,8 @@ export default function ScheduleTable({ result }) {
                     </td>
 
                     <td className="px-3 py-2.5 text-right">
-                      <span className="font-semibold text-[#F9FAFB]">{row.battery_soc_pct.toFixed(0)}%</span>
-                      <span className="text-[10px] text-[#94A3B8] block">({row.battery_soc_kwh.toFixed(1)} kWh)</span>
+                      <span className="font-semibold text-[#F9FAFB]">{row.battery_soc_kwh.toFixed(1)} kWh</span>
+                      <span className="text-[10px] text-[#94A3B8] block">({row.battery_soc_pct.toFixed(0)}%)</span>
                     </td>
 
                     <td className="px-3 py-2.5 text-right">
@@ -172,11 +177,17 @@ export default function ScheduleTable({ result }) {
                     </td>
 
                     <td className="px-3 py-2.5 text-right text-[#94A3B8]">
-                      ${row.tariff_per_kwh.toFixed(2)}
+                      ৳{(row.tariff_bdt_per_kwh ?? row.tariff_per_kwh ?? 0).toFixed(2)}
                     </td>
 
                     <td className="px-3 py-2.5 text-right font-bold text-[#F9FAFB]">
-                      ${row.hourly_cost.toFixed(3)}
+                      ৳{(row.hourly_cost_bdt ?? row.hourly_cost ?? 0).toFixed(2)}
+                    </td>
+
+                    <td className="px-3 py-2.5 text-center">
+                      <Badge variant={isValid ? "success" : "danger"}>
+                        {isValid ? "VALID" : "ERROR"}
+                      </Badge>
                     </td>
 
                     <td className="px-4 py-2.5">

@@ -21,7 +21,7 @@ export default function HistoryView({ historyList, onSelectHistoryItem }) {
         <div>
           <h2 className="text-[16px] font-semibold text-[#F9FAFB] flex items-center gap-2">
             <History className="w-4 h-4 text-[#2563EB]" />
-            Optimization Audit Log & History
+            Optimization Audit Log & History (BDT ৳)
           </h2>
           <p className="text-[12px] text-[#94A3B8] mt-0.5">
             Previous energy dispatch runs saved in PostgreSQL database.
@@ -36,6 +36,7 @@ export default function HistoryView({ historyList, onSelectHistoryItem }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {historyList.map((item, index) => {
             const dateStr = item.created_at ? new Date(item.created_at).toLocaleString() : 'Recent';
+            const costVal = item.total_cost_bdt ?? item.total_cost ?? 0;
             return (
               <div
                 key={item.id || index}
@@ -66,7 +67,7 @@ export default function HistoryView({ historyList, onSelectHistoryItem }) {
                 <div className="grid grid-cols-3 gap-2 text-[12px] font-mono pt-2 border-t border-[#374151]">
                   <div>
                     <span className="text-[10px] text-[#94A3B8] block uppercase">Cost</span>
-                    <span className="font-bold text-[#F9FAFB]">${Number(item.total_cost || 0).toFixed(2)}</span>
+                    <span className="font-bold text-[#F9FAFB]">৳{Number(costVal).toFixed(2)}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#94A3B8] block uppercase">Solar</span>

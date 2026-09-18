@@ -1,6 +1,6 @@
-﻿"""
+"""
 Supabase Database Integration for GridWise AI Platform
-Uses direct REST PostgREST API with fallback in-memory store for high reliability.
+Persists optimization runs with BDT currency, battery conservation metrics, and validation logs.
 """
 import os
 import datetime
@@ -41,19 +41,24 @@ class DatabaseManager:
         record = {
             "id": record_id,
             "scenario_name": scenario.name,
+            "currency": "BDT (৳)",
             "raw_prompt": raw_prompt or "",
-            "total_cost": float(result.total_cost),
-            "baseline_cost": float(result.baseline_cost),
+            "total_cost": float(result.total_cost_bdt),
+            "baseline_cost": float(result.baseline_cost_bdt),
             "savings_pct": float(result.savings_pct),
-            "savings_amount": float(result.savings_amount),
+            "savings_amount": float(result.savings_amount_bdt),
             "total_solar_used_kwh": float(result.total_solar_used_kwh),
             "total_grid_imported_kwh": float(result.total_grid_imported_kwh),
             "total_battery_charged_kwh": float(result.total_battery_charged_kwh),
             "total_battery_discharged_kwh": float(result.total_battery_discharged_kwh),
+            "initial_battery_kwh": float(result.initial_battery_kwh),
+            "final_battery_kwh": float(result.final_battery_kwh),
+            "battery_energy_balanced": bool(result.battery_energy_balanced),
             "solver_status": result.solver_status,
             "directives_count": len(directives),
             "hourly_schedule": [item.model_dump() for item in result.hourly_schedule],
             "directives_applied": [d.model_dump() for d in directives],
+            "validation_passed": bool(result.validation_passed),
             "created_at": timestamp
         }
 
@@ -67,8 +72,8 @@ class DatabaseManager:
                 payload = {
                     "scenario_name": scenario.name,
                     "raw_prompt": raw_prompt or "",
-                    "total_cost": float(result.total_cost),
-                    "baseline_cost": float(result.baseline_cost),
+                    "total_cost": float(result.total_cost_bdt),
+                    "baseline_cost": float(result.baseline_cost_bdt),
                     "savings_pct": float(result.savings_pct),
                     "total_solar_used_kwh": float(result.total_solar_used_kwh),
                     "total_grid_imported_kwh": float(result.total_grid_imported_kwh),
